@@ -1,0 +1,29 @@
+# Configuration for Snakemake
+
+# Paths to large input data
+path_to_roulette_vcfs: "/path"
+path_to_sample_allele_count_arrays: "/path"
+
+# Define models
+demogs:
+  - "equilibrium_granular_Ne"
+  - "equilibrium_single_Ne"
+
+mut_models:
+  - "carlson"
+  - "gnomad"
+  - "roulette"
+
+cons_models:
+  - "merged_cds_regulatory"
+  - "split_cds_regulatory"
+  - "merged_cds_phastcons"
+  - "split_cds_phastcons"
+
+# Define for which models we should create fine-scale B maps
+
+fine_map_demogs: ["equilibrium_granular_Ne"]
+fine_map_mut_models: ["roulette"]
+fine_map_cons_models: 
+  - "split_cds_regulatory"
+  - "split_cds_phastcons"

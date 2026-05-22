@@ -1,0 +1,13 @@
+1,0.979653461639209,roulette,exons_phastcons_roulette_chr1
+2,0.9792331251411456,roulette,exons_phastcons_roulette_chr2
+3,0.9788661027066524,roulette,exons_phastcons_roulette_chr3
+4,0.978440957783908,roulette,exons_phastcons_roulette_chr4
+5,0.9786167649864704,roulette,exons_phastcons_roulette_chr5
+6,0.9786474942232634,roulette,exons_phastcons_roulette_chr6
+7,0.9785817196516072,roulette,exons_phastcons_roulette_chr7
+8,0.9783621698692956,roulette,exons_phastcons_roulette_chr8
+9,0.978440205351322,roulette,exons_phastcons_roulette_chr9
+10,0.9784117656223748,roulette,exons_phastcons_roulette_chr10
+11,0.9787219457278958,roulette,exons_phastcons_roulette_chr11
+12,0.9785776411223626,roulette,exons_phastcons_roulette_chr12
+15,0.9782196281033142,roulette,exons_phastcons_roulette_chr15

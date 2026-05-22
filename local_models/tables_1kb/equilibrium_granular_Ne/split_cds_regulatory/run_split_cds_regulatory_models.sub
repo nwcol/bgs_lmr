@@ -1,0 +1,111 @@
+
+log    = logs/$(Cluster).$(Process).log
+error  = logs/$(Cluster).$(Process).err
+output = logs/$(Cluster).$(Process).out
+
+requirements    = (Target.HasCHTCStaging == true)
+container_image = file:///staging/nwcollier/bgs_container.sif
+
+executable = predict.sh
+
+arguments = \
+    $(chrom) \
+    $(mutmodel) \
+    --Ne $(Ne) \
+    --B_unlinked $(B) \
+    --n_cores 32 \
+    --chunk_size 100 \
+    --spacing 1000 \
+    --window_size 1000 \
+    --n_corrs 10 \
+    --save_corrs \
+    --rich \
+    --lookup_tbl lookup_tbl_eq_Ne10k.csv.gz \
+    --rmap YRI_recombination_map_hapmap_format_hg38_chr_$(chrom).txt.gz \
+    --umap $(mutmodel)_map_chr$(chrom).npy \
+    --mask mask_chr$(chrom).bed.gz \
+    --bed \
+        exons_lof_d1_chr$(chrom).bed.gz \
+        exons_lof_d2_chr$(chrom).bed.gz \
+        exons_lof_d3_chr$(chrom).bed.gz \
+        exons_lof_d4_chr$(chrom).bed.gz \
+        exons_lof_d5_chr$(chrom).bed.gz \
+        exons_lof_d6_chr$(chrom).bed.gz \
+        exons_lof_d7_chr$(chrom).bed.gz \
+        exons_lof_d8_chr$(chrom).bed.gz \
+        exons_lof_d9_chr$(chrom).bed.gz \
+        exons_lof_d10_chr$(chrom).bed.gz \
+        exons_lof_d11_chr$(chrom).bed.gz \
+        promoters_chr$(chrom).bed.gz \
+        enhancers_chr$(chrom).bed.gz \ 
+    --shapes \
+        0.295103487 \
+        0.255625629 \
+        0.242348429 \
+        0.212462538 \
+        0.163208306 \
+        0.166425297 \
+        0.102277280 \
+        0.109320215 \
+        0.117575873 \
+        0.136438277 \
+        0.089341335 \
+        0.110826289 \
+        0.010053918 \
+    --scales \
+        0.205817426 \
+        0.168927766 \
+        0.085033396 \ 
+        0.085390107 \
+        0.137840626 \
+        0.026519220 \
+        0.109684337 \
+        0.044893878 \
+        0.020591503 \
+        0.008739929 \
+        0.055993047 \
+        0.000499835 \
+        0.226519102 \
+    --p_neus \
+        0.27789283 \
+        0.28255236 \
+        0.28318163 \
+        0.28209721 \
+        0.27916391 \
+        0.27682456 \
+        0.27822116 \
+        0.27793309 \
+        0.28025591 \
+        0.28027929 \
+        0.28912967 \
+        0.0 \
+        0.0 \
+    --verbose \
+    --out $(outfname) \
+
+transfer_input_files = \
+    ../../data/recombination_maps/pyrho/YRI_recombination_map_hapmap_format_hg38_chr_$(chrom).txt.gz, \
+    ../../data/masks/strict_$(mutmodel)/mask_chr$(chrom).bed.gz, \
+    ../../data/lookup_tables/lookup_tbl_eq_Ne10k.csv.gz, \
+    ../../data/annotations/functional/exons_lof_deciles/exons_lof_d1_chr$(chrom).bed.gz, \
+    ../../data/annotations/functional/exons_lof_deciles/exons_lof_d2_chr$(chrom).bed.gz, \
+    ../../data/annotations/functional/exons_lof_deciles/exons_lof_d3_chr$(chrom).bed.gz, \
+    ../../data/annotations/functional/exons_lof_deciles/exons_lof_d4_chr$(chrom).bed.gz, \
+    ../../data/annotations/functional/exons_lof_deciles/exons_lof_d5_chr$(chrom).bed.gz, \
+    ../../data/annotations/functional/exons_lof_deciles/exons_lof_d6_chr$(chrom).bed.gz, \
+    ../../data/annotations/functional/exons_lof_deciles/exons_lof_d7_chr$(chrom).bed.gz, \
+    ../../data/annotations/functional/exons_lof_deciles/exons_lof_d8_chr$(chrom).bed.gz, \
+    ../../data/annotations/functional/exons_lof_deciles/exons_lof_d9_chr$(chrom).bed.gz, \
+    ../../data/annotations/functional/exons_lof_deciles/exons_lof_d10_chr$(chrom).bed.gz, \
+    ../../data/annotations/functional/exons_lof_deciles/exons_lof_d11_chr$(chrom).bed.gz, \
+    ../../data/annotations/functional/promoters/promoters_chr$(chrom).bed.gz, \
+    ../../data/annotations/functional/enhancers/enhancers_chr$(chrom).bed.gz
+
+should_transfer_files   = YES
+when_to_transfer_output = ON_EXIT
+request_cpus            = 32
+request_memory          = $(memreq)
+retry_request_memory    = 48GB
+request_disk            = 4GB
+
+queue chrom,B,Ne,mutmodel,memreq,outfname from split_cds_regulatory_variables.txt

@@ -1,0 +1,61 @@
+
+log    = logs/$(Cluster).$(Process).log
+error  = logs/$(Cluster).$(Process).err
+output = logs/$(Cluster).$(Process).out
+
+requirements    = (Target.HasCHTCStaging == true)
+container_image = file:///staging/nwcollier/bgs_container.sif
+
+executable = predict.sh
+
+arguments = \
+    $(chrom) \
+    $(mutmodel) \
+    --Ne $(Ne) \
+    --B_unlinked $(B) \
+    --n_cores 32 \
+    --chunk_size 100 \
+    --spacing 1000 \
+    --window_size 1000 \
+    --n_corrs 10 \
+    --save_corrs \
+    --rich \
+    --lookup_tbl lookup_tbl_eq_Ne10k.csv.gz \
+    --rmap YRI_recombination_map_hapmap_format_hg38_chr_$(chrom).txt.gz \
+    --umap $(mutmodel)_map_chr$(chrom).npy \
+    --mask mask_chr$(chrom).bed.gz \
+    --bed \
+        exons_chr$(chrom).bed.gz \
+        promoters_chr$(chrom).bed.gz \
+        enhancers_chr$(chrom).bed.gz \ 
+    --shapes \
+        0.215000000 \
+        0.110826289 \
+        0.010053918 \
+    --scales \
+        0.023964000 \
+        0.000499835 \
+        0.226519102 \
+    --p_neus \
+        0.302 \
+        0.0 \
+        0.0 \
+    --verbose \
+    --out $(outfname)
+
+transfer_input_files = \
+    ../../data/recombination_maps/pyrho/YRI_recombination_map_hapmap_format_hg38_chr_$(chrom).txt.gz, \
+    ../../data/masks/strict_$(mutmodel)/mask_chr$(chrom).bed.gz, \
+    ../../data/lookup_tables/lookup_tbl_eq_Ne10k.csv.gz, \
+    ../../data/annotations/functional/exons/exons_chr$(chrom).bed.gz, \
+    ../../data/annotations/functional/promoters/promoters_chr$(chrom).bed.gz, \
+    ../../data/annotations/functional/enhancers/enhancers_chr$(chrom).bed.gz
+
+should_transfer_files   = YES
+when_to_transfer_output = ON_EXIT
+request_cpus            = 32
+request_memory          = $(memreq)
+retry_request_memory    = 48GB
+request_disk            = 4GB
+
+queue chrom,B,Ne,mutmodel,memreq,outfname from merged_cds_regulatory_vars.txt

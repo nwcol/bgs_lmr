@@ -1,0 +1,3 @@
+22,0.9778810839966028,roulette,exons_phastcons_roulette_chr22
+22,0.9742433100027168,carlson,exons_phastcons_carlson_chr22
+22,0.977037962232384,gnomad,exons_phastcons_gnomad_chr22

@@ -1,0 +1,110 @@
+
+log    = logs/$(Cluster).$(Process).log
+error  = logs/$(Cluster).$(Process).err
+output = logs/$(Cluster).$(Process).out
+requirements    = (Target.HasCHTCStaging == true)
+container_image = file:///staging/valadaresbar/bgs_container.sif
+
+executable = predict.sh
+
+arguments = \
+    $(chrom) \
+    $(mutmodel) \
+    --Ne $(Ne) \
+    --B_unlinked $(B) \
+    --n_cores 32 \
+    --chunk_size 100 \
+    --spacing 1000 \
+    --window_size 1000 \
+    --n_corrs 10 \
+    --save_corrs \
+    --rich \
+    --lookup_tbl lookup_tbl_eq_Ne10k.csv.gz \
+    --rmap YRI_recombination_map_hapmap_format_hg38_chr_$(chrom).txt.gz \
+    --umap $(mutmodel)_map_chr$(chrom).npy \
+    --mask mask_chr$(chrom).bed.gz \
+    --bed \
+        exons_chr$(chrom).bed.gz \
+        phastcons_top0-5_chr$(chrom).bed.gz \
+        phastcons_top5-10_chr$(chrom).bed.gz \
+        phastcons_top10-15_chr$(chrom).bed.gz \
+        phastcons_top15-20_chr$(chrom).bed.gz \
+        phastcons_top20-25_chr$(chrom).bed.gz \
+        phastcons_top25-30_chr$(chrom).bed.gz \
+        phastcons_top30-35_chr$(chrom).bed.gz \
+        phastcons_top35-40_chr$(chrom).bed.gz \
+        phastcons_top40-45_chr$(chrom).bed.gz \
+        phastcons_top45-50_chr$(chrom).bed.gz \
+        phastcons_top50-55_chr$(chrom).bed.gz \
+        phastcons_top55-60_chr$(chrom).bed.gz \
+    --shapes \
+        0.215 \
+        0.168882734 \
+        0.126688411 \
+        0.113054332 \
+        0.092281036 \
+        0.081231034 \
+        0.072625226 \
+        0.054260552 \
+        0.047698916 \
+        0.050091391 \
+        0.038489161 \
+        0.034218141 \
+        0.030460386 \
+    --scales \
+        0.023964017 \
+        0.001780096 \
+        0.001151328 \
+        0.001052922 \
+        0.001357935 \
+        0.001391043 \
+        0.001523661 \
+        0.002906352 \
+        0.003275467 \
+        0.002288379 \
+        0.004252139 \
+        0.004347977 \
+        0.004516110 \
+    --p_neus \
+        0.302 \
+        0 \
+        0 \
+        0 \
+        0 \
+        0 \
+        0 \
+        0 \
+        0 \
+        0 \
+        0 \
+        0 \
+        0 \
+    --verbose \
+    --out $(outfname) \
+
+transfer_input_files = \
+    ../../data/recombination_maps/pyrho/YRI_recombination_map_hapmap_format_hg38_chr_$(chrom).txt.gz, \
+    ../../data/masks/strict_$(mutmodel)/mask_chr$(chrom).bed.gz, \
+    ../../data/lookup_tables/lookup_tbl_eq_Ne10k.csv.gz, \
+    ../../data/annotations/functional/exons/exons_chr$(chrom).bed.gz, \
+    ../../data/annotations/phastcons/top0-5/phastcons_top0-5_chr$(chrom).bed.gz, \
+    ../../data/annotations/phastcons/top5-10/phastcons_top5-10_chr$(chrom).bed.gz, \
+    ../../data/annotations/phastcons/top10-15/phastcons_top10-15_chr$(chrom).bed.gz, \
+    ../../data/annotations/phastcons/top15-20/phastcons_top15-20_chr$(chrom).bed.gz, \
+    ../../data/annotations/phastcons/top20-25/phastcons_top20-25_chr$(chrom).bed.gz, \
+    ../../data/annotations/phastcons/top25-30/phastcons_top25-30_chr$(chrom).bed.gz, \
+    ../../data/annotations/phastcons/top30-35/phastcons_top30-35_chr$(chrom).bed.gz, \
+    ../../data/annotations/phastcons/top35-40/phastcons_top35-40_chr$(chrom).bed.gz, \
+    ../../data/annotations/phastcons/top40-45/phastcons_top40-45_chr$(chrom).bed.gz, \
+    ../../data/annotations/phastcons/top45-50/phastcons_top45-50_chr$(chrom).bed.gz, \
+    ../../data/annotations/phastcons/top50-55/phastcons_top50-55_chr$(chrom).bed.gz, \
+    ../../data/annotations/phastcons/top55-60/phastcons_top55-60_chr$(chrom).bed.gz
+
+should_transfer_files   = YES
+when_to_transfer_output = ON_EXIT
+request_cpus            = 32
+request_memory          = $(memreq)
+retry_request_memory    = 48GB
+request_disk            = 4GB
+
+queue chrom,B,Ne,mutmodel,memreq,outfname from merged_cds_phastcons_variables.txt

@@ -1,0 +1,66 @@
+GRCh38 GENOME MASKS
+====================
+
+This directory contains GRCh38 genomic masks that help identify regions of the genome
+that are more or less accessible to next generation sequencing methods using
+short reads.
+
+Each mask is summarized in a fasta file (one fasta file per chromosome), coded
+as follows:
+
+N - the base is an N in the reference genome GRCh37
+L - depth of coverage is much lower than average
+H - depth of coverage is much higher than average
+Z - too many reads with zero mapping quality overlap this position
+Q - the average mapping quality at the position is too low
+P - the base passed all filters
+0 - an overlapping base was never observed in aligned reads
+
+Regions marked as L, H, Z or Q are less accessible to short reads. Although
+they can still be analyzed they are more prone to false positives. 
+
+The calculation of accessibility is based on the alignment of whole genome low coverage
+data of 2691 phase3 samples to GRCh38.
+
+The masks are useful for (a) comparing accessibility using current technologies
+to accessibility in the pilot project, and (b) population genetic analysis (such
+as estimates of mutation rate) that must focus on genomic regions with very
+low false positive and false negative rates.
+
+PilotMask DIRECTORY
+===================
+
+The PilotMask directory uses the same mask definition used in the 1000 Genomes
+Project Pilot Paper (Nature, 2010). This definition excludes the portion of the
+genome where depth of coverage (summed across all samples) was higher or lower
+than the average depth by a factor of 2-fold. It also excludes sites where 
+>20% of overlapping reads had mapping quality of zero.
+
+The average total depth of coverage across Phase 3 samples on GRCh38 is 20360. Thus, sites
+with a depth of coverage of <10180 or >40720 were excluded. 
+
+Overall, this mask results in 5.3% of bases marked N, 1.4% marked
+L, 0.6% marked H and 3.7% marked Z. The remaining 89.0% of passed are marked 
+passed (P) - and correspond to 94.0% of non-N bases.
+
+In addition to masked fasta files, a bed file of all passed sites can be found in this directory.
+
+StrictMask DIRECTORY
+====================
+
+The StrictMask directory uses a more stringent definition. This definition uses
+a narrower band for coverage, requiring that total coverage should be within 50%
+of the average, that no more than 0.1% of reads have mapping quality of zero, 
+and that the average mapping quality for the position should be 56 or greater.
+
+This definition is quite stringent and focuses on the most unique regions of the 
+genome.
+
+The average total depth of coverage across Phase 3 samples is 20360. Thus, sites
+with a depth of coverage of <10180 or >30540 were excluded.
+
+Overall, this strict mask results in about 5.3% of bases marked N, 1.4% marked
+L, 1.0% marked H, 18.1% marked Z, and 0% marked Q. The remaining 74.1% of
+passed are marked passed (P) - corresponding to 78.2% of the non-N bases.
+
+In addition to masked fasta files, a bed file of all passed sites can be found in this directory.

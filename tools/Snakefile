@@ -5,6 +5,28 @@ COMMENT
 configfile: "../config/config.yaml"
 
 
+rule prepare_data:
+    # Produces files needed for B-prediction.
+    input:
+        expand("../data/pi_tables/{mut}/pi_tbl_YRI_chr{c}.csv.gz",
+               mut=config["mut_models"], c=range(1, 23))
+
+
+rule build_pi_tables:
+    # Compute diversity in 1kb windows, using mask coverages defined by
+    # mutation map coverage and the strict 1KG mask.
+    input:
+        ndns = "../data/ndns_arrays/ndns_YRI_chr{c}.npy",
+        mask = "../data/masks/strict_{mut}/mask_chr{c}.bed.gz"
+    output:
+        "../data/pi_tables/{mut}/pi_tbl_YRI_chr{c}.csv.gz"
+    shell:
+        """
+        python scripts/build_pi_table.py \
+            -i {input.ndns} \
+            --mask {input.mask} \
+            -o {output}
+        """
 
 
 rule build_models:

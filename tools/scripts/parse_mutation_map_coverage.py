@@ -1,6 +1,13 @@
 """
 Load a .npy file representing a site-resolution mutation map, and construct a
 .bed mask file recording intervals of non-missing mutation data.
+
+Usage
+-----
+$ python parse_mutation_map_coverage.py \
+    -i mut_map.npy \
+    -chrom 22 \
+    -o mut_map_coverage.bed.gz
 """
 
 import argparse

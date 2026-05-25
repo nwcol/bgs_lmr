@@ -4,8 +4,14 @@ gVCF file (a .vcf-format file covering both variant and invariant sites).
 
 Outputs a table of allele counts in .npy format for each chromosome. The 0th
 column of this table holds reference allele counts and the 1st column holds
-alternate allele counts (alternate alleles are not distinguished). Only 
-single-nucleotide variants are considered. 
+alternate allele counts (alternate alleles are not distinguished).
+
+Usage
+-----
+$ python parse_gvcf.py \
+    -i input.vcf.gz \
+    -g hg38.genome \
+    -o allele_counts.npy
 """
 
 import argparse
@@ -42,7 +48,7 @@ def get_args():
     parser.add_argument(
         '--min_GQ',
         type=float,
-        default=30, 
+        default=30,
         help='Minimum GQ to pass filter'
     )
     parser.add_argument(
@@ -62,8 +68,8 @@ def get_args():
 
 def read_seq_lens(fname):
     """
-    Obtain sequence lengths from the input file header. 
-    """ 
+    Obtain sequence lengths from the input file header.
+    """
     open_func = gzip.open if fname.endswith('gz') else open
     seq_lens = dict()
     with open_func(fname, 'rb') as file:
@@ -131,9 +137,6 @@ def write_log(chrom_stats, prefix):
 
 
 def main():
-    """
-    
-    """
     args = get_args()
     fin = args.in_fname
     prefix = args.out_prefix
@@ -177,9 +180,10 @@ def main():
                     dic = stats.__dict__
                     prstats = '\t'.join(f'{key} = {dic[key]}' for key in dic)
                     print(
-                        Util._get_time(), f'wrote {last_chrom} counts to {fname}'
+                        Util._get_time(), 
+                        f'wrote {last_chrom} counts to {fname}'
                         f' {prstats}'
-                    )                    
+                    )
                     chrom_stats[last_chrom] = stats
                 if chrom in seq_lens:
                     counts = np.zeros((seq_lens[chrom], 2), dtype=np.uint8)

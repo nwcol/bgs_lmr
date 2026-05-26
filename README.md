@@ -5,20 +5,25 @@ selection (BGS) and mutation rate variation, preprinted here: XXX
 
 ## Contents
 
-`config` contains configuration files for the Snakemake pipeline.
+[config/](config) contains configuration files for the Snakemake pipeline.
 
-`data` contains data used to compute expected diversity reductions due to BGS
-and expected/observed diversity. See [data/readme.md] for more details.
+[data/](data) contains data used to compute expected diversity reductions due to BGS
+and expected/observed diversity. See the `README.txt` files in its subdirectories
+for further details.
 
-`local_models` contains scripts used to compute expected BGS at a fine genomic
-resolution (1kb).
+[local\_models/](local_models) contains scripts used to compute expected BGS at
+a fine genomic resolution (1kb).
 
-`models` contains final predictions at 10kb coarseness. These are scaled-up
-versions of the models in [local\_models/]. This directory also contains some
-tables summarizing predictions and goodness-of-fit.
+[models/](models) contains final predictions at 10kb coarseness. These are
+scaled-up versions of the models in [local\_models/].
+Fine-scale `B`-maps for a subset of models can be found in 
+[models/maps\_1kb/](models/maps_1kb).
+This directory also contains some tables summarizing predictions and 
+goodness-of-fit.
 
-`tools` contains R scripts for downstream analysis, Python notebooks for
-summarizing expectations, and the Snakemake pipeline for assembling input data.
+[tools/](tools) contains R scripts for downstream analysis, Python notebooks
+for summarizing expectations, and the Snakemake pipeline for assembling input 
+data. See its [README.md](tools/README.md) for more.
 
 ## Requirements
 
@@ -41,6 +46,13 @@ pip install git+https://github.com/apragsdale/bgshr
 
 ## Reproducing data and predictions
 
+To reproduce the empirical dataset, follow the instructions for running the
+[Snakefile](tools/Snakefile) in [tools/README.md](tools/README.md).
+Some large files must be downloaded manually, and the configuration file
+[config/config.yaml](config/config.yaml) edited to point to the directory that
+contains them.
 
-
+Scripts for fitting the effective population size and predicting `B` are
+written to run on the UW-Madison Center for High-Throughput Computing (CHTC)
+server, which uses the HTCondor environment.
 

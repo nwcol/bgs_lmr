@@ -49,7 +49,7 @@ labelled `roulette` is produced for these two models.
 You can construct the genetic masks using:
 
 ```
-snakemake --cores 8 build_masks
+snakemake --cores 8 build_genetic_masks
 ```
 
 This parses the coverage of mutation maps with unique coverage profiles and
@@ -57,7 +57,17 @@ intersects covered intervals with 1KG strict mask intervals.
 
 #### Diversity data
 
-We estimate diversity from sample-specific GVCF files
+We estimate diversity from sample-specific GVCF files.
+
+To reproduce the diversity dataset, download the files corresponding to 108
+YRI samples (listed in [YRI\_sample\_ids.txt](../config/YRI_sample_ids.txt)) from
+http://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data\_collections/1000G\_2504\_high\_coverage/working/20190425\_NYGC\_GATK/raw\_calls\_updated/
+and update the `gvcf_dir` field in [config.yaml](../config/config.yaml).
+You'll also need to update the `allele_count_dir` field in the configuration
+file.
+It may be desirable to place the GVCF and allele count array directories on
+an external drive, as these take a large amount of disk space (~500GB each).
+After gathering these files, you can regenerate diversity data by running:
 
 ```
 snakemake --cores 4 estimate_diversity
@@ -65,14 +75,14 @@ snakemake --cores 4 estimate_diversity
 
 ### Computing expected maps
 
-
+Because predicting `B` is computationally expensive, we ran predictions on a
+high-throughput computing cluster.
+There is therefore a discontinuity in the Snakemake pipeline.
+Tables with predicted `B`-values can be reproduced using the HTCondor scripts
+housed in [local\_models/](../local_models).
 
 ### Building tables for downstream analysis
 
-Because predicting B is computationally expensive, we ran predictions on a
-high-throughput computing cluster.
-There is therefore a discontinuity in the pipeline.
-Scripts for reproducing B predictions can be found in `../local_models/`.
 After predicted tables have been assembled in that directory, Snakemake can be
 invoked to build tables for downstream analysis using
 

@@ -1,25 +1,215 @@
-"""
-COMMENT
-"""
 
 configfile: "../config/config.yaml"
+chroms = list(range(1, 23))
 
 
-rule prepare_data:
-    # Produces files needed for B-prediction.
+rule all:
+    # Dummy `all` rule; see ./README.md for rules to reproduce data
     input:
-        expand("../data/pi_tables/{mut}/pi_tbl_YRI_chr{c}.csv.gz",
-               mut=config["mut_models"], c=range(1, 23))
+
+
+"""
+Mutation rate data
+"""
+
+
+def get_mut_model_info_tag(model):
+    # Retrieve the VCF INFO tag that corresponds to a given mutation model.
+    if model == "carlson":
+        return "MC"
+    elif model == "gnomad":
+        return "MG"
+    elif model == "roulette":
+        return "MR"
+    else:
+        return None
+
+
+rule parse_mutation_maps:
+    # Execute this rule to rebuild mutation map arrays.
+    input:
+        expand("../data/mutation_arrays/{mut}/{mut}_map_chr{chrom}.npy",
+               mut=config["mut_models"], chrom=chroms)
+
+
+rule parse_mutation_map:
+    # Extract site mutation rates from a Roulette VCF and save them in a .npy
+    # file.
+    input:
+        config["roulette_vcf_dir"] + "{chrom}_rate_v5.2_TFBS_correction_all.vcf.gz"
+    output:
+        "../data/mutation_arrays/{mut}/{mut}_map_chr{chrom}.npy"
+    params:
+        info_field = get_mut_model_info_tag("{mut}")
+    shell:
+        """
+        python scripts/parse_roulette_vcf.py \
+            -i {input} \
+            -o {output} \
+            --field {params.info_field} \
+            --verbosity 10000000
+        """
+
+
+"""
+Genetic masks
+"""
+
+
+rule build_genetic_masks:
+    input:
+        expand("../data/masks/strict_{mut}/mask_chr{chrom}.bed.gz",
+               mut=config["mut_models"], chrom=chroms)
+
+
+rule download_strict_mask:
+    # Download the CRCh38 1000 Genomes Project `strict` mask.
+    output:
+        temp("../data/masks/strict_1kg/20160622.allChr.mask.bed")
+    params:
+        link = (
+            "https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/"
+            "1000_genomes_project/working/20160622_genome_mask_GRCh38/"
+            "StrictMask/20160622.allChr.mask.bed"),
+        prefix = "../data/masks/strict_1kg/"
+    shell:
+        """
+        wget {params.link} -P {params.prefix}
+        """
+
+
+rule extract_strict_mask:
+    # Break the `strict` mask up into single-chromosome files.
+    input:
+        "../data/masks/strict_1kg/20160622.allChr.mask.bed"
+    params:
+        chrom = "chr{chrom}"
+    output:
+        raw = temp("../data/masks/strict_1kg/strict_mask_chr{chrom}.bed"),
+        zipped = "../data/masks/strict_1kg/strict_mask_chr{chrom}.bed.gz"
+    shell:
+        """
+        awk '$1 == {params.chrom} {{ print $1, $2, $3 }}' {input} > {output.raw}
+        gzip {output.raw}
+        """
+
+
+rule parse_mutation_map_coverage:
+    # Make a BED file holding intervals of non-missing data in a mutation rate
+    # array (.npy).
+    input:
+        "../data/mutation_arrays/{mut}/{mut}_map_chr{chrom}.npy"
+    params:
+        chrom = "{chrom}"
+    output:
+        "../data/masks/{mut}_coverage/mask_chr{chrom}.bed.gz"
+    shell:
+        """
+        python scripts/parse_mutation_map_coverage.py \
+            -i {input} \
+            -o {output} \
+            --chrom {params.chrom}
+        """
+
+
+rule merge_masks:
+    # Merge the 1KG mask with a mutation map coverage mask.
+    input:
+        "../data/masks/strict_1kg/strict_mask_chr{chrom}.bed.gz",
+        "../data/masks/{mut}_coverage/mask_chr{chrom}.bed.gz"
+    output:
+        "../data/masks/strict_{mut}/mask_chr{chrom}.bed.gz"
+    shell:
+        """
+        python scripts/merge_bedfiles.py \
+            -i {input} \
+            -o {output} \
+            --intersect
+        """
+
+"""
+Diversity data
+"""
+
+rule estimate_diversity:
+    input:
+        expand("../data/pi_tables/{mut}/pi_tbl_YRI_chr{chrom}.csv.gz",
+               mut=config["mut_models"], chrom=chroms)
+
+
+def get_sample_ids(fname):
+    # Load sample IDs from a text file, with one ID on each line.
+    samples = []
+    with open(fname, "r") as fin:
+        for line in fin:
+            samples.append(line.rstrip("\n"))
+    return samples
+
+
+YRI_samples = get_sample_ids(config["sample_id_file"])
+
+
+rule parse_gvcf:
+    # Extract 22 arrays of allele counts from a GVCF file; one for each
+    # autosome.
+    input:
+        gvcf = config["gvcf_dir"] + "{sample}.haplotypeCalls.er.raw.vcf.gz",
+        genome_file = "../data/h38.genome"
+    output:
+        expand(config["allele_count_dir"] + "{{sample}}_allele_counts_chr{chrom}.npy",
+               chrom=chroms)
+    params:
+        prefix = config["allele_count_dir"] + "{sample}_allele_counts"
+    shell:
+        """
+        python scripts/parse_gvcf.py \
+            -i {input.gvcf} \
+            -o {params.prefix} \
+            -g {input.genome_file} \
+            --min_GQ 30 \
+            --min_QUAL 50 \
+            --verbose 10000000
+        """
+
+
+rule sum_allele_counts:
+    # Take the sum of allele counts across the sample set, for a chromosome.
+    input:
+        expand(config["allele_count_dir"] + "{sample}_allele_counts_chr{{chrom}}.npy",
+              sample=YRI_samples)
+    output:
+        "../data/allele_count_arrays/allele_counts_YRI_chr{chrom}.npy"
+    shell:
+        """
+        python scripts/sum_allele_count_arrays.py \
+            -i {input} \
+            -o {output}
+        """
+
+
+rule compute_ndns:
+    # Compute an array of the number of same/different-by-state allele pairs
+    # sampled at each site (nD, nS).
+    input:
+        "../data/allele_count_arrays/allele_counts_YRI_chr{chrom}.npy"
+    output:
+        "../data/ndns_arrays/ndns_YRI_chr{chrom}.npy"
+    shell:
+        """
+        python scripts/build_ndns_array.py \
+            -i {input} \
+            -o {output}
+        """
 
 
 rule build_pi_tables:
     # Compute diversity in 1kb windows, using mask coverages defined by
     # mutation map coverage and the strict 1KG mask.
     input:
-        ndns = "../data/ndns_arrays/ndns_YRI_chr{c}.npy",
-        mask = "../data/masks/strict_{mut}/mask_chr{c}.bed.gz"
+        ndns = "../data/ndns_arrays/ndns_YRI_chr{chrom}.npy",
+        mask = "../data/masks/strict_{mut}/mask_chr{chrom}.bed.gz"
     output:
-        "../data/pi_tables/{mut}/pi_tbl_YRI_chr{c}.csv.gz"
+        "../data/pi_tables/{mut}/pi_tbl_YRI_chr{chrom}.csv.gz"
     shell:
         """
         python scripts/build_pi_table.py \
@@ -29,7 +219,12 @@ rule build_pi_tables:
         """
 
 
-rule build_models:
+"""
+10kb prediction tables
+"""
+
+
+rule get_model_tables:
     # Invokes `build_10kb_tables` and `build_1kb_B_maps` to full ../models/
     # with tables derived from ../local_models/ and ../data/pi_tables/.
     input:
@@ -45,7 +240,7 @@ rule build_10kb_tables:
     # Builds tables with B and observed/expected pi.
     input:
         pred_tbl = "../local_models/tables_1kb/{dem}/{con}/{mut}/{con}_{mut}_chr{c}.csv.gz",
-        pi_tbl   = "../data/pi_tables/{mut}/pi_tbl_YRI_chr{c}.csv.gz",
+        pi_tbl = "../data/pi_tables/{mut}/pi_tbl_YRI_chr{c}.csv.gz",
         band_tbl = "../data/cytoBand.txt"
     output:
         "../models/tables_10kb/{dem}/{con}/{mut}/B_tbl_YRI_chr{c}_10kb.csv.gz"

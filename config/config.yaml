@@ -1,8 +1,15 @@
 # Configuration for Snakemake
+# Paths are relative to bgs_lmr/tools
 
 # Paths to large input data
-path_to_roulette_vcfs: "/path"
-path_to_sample_allele_count_arrays: "/path"
+roulette_vcf_dir: "../data/roulette_vcfs/"
+gvcf_dir: "/media/nick/Elements/Data/NYGC_hg38/gvcfs/"
+
+# Paths to large intermediate data
+allele_count_dir: "/media/nick/Elements/Data/NYGC_hg38/allele_count_arrays/"
+
+# Sample IDs
+sample_id_file: "../config/YRI_sample_ids.txt"
 
 # Define models
 demogs:

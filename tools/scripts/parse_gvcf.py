@@ -54,7 +54,7 @@ def get_args():
     parser.add_argument(
         '--min_QUAL',
         type=float,
-        default=50, 
+        default=50,
         help='Minimum QUAL to pass filter'
     )
     parser.add_argument(
@@ -97,7 +97,7 @@ def read_genome_file(fname):
     seq_lens = {}
     with open(fname, 'r') as file:
         for line in file:
-            chrom, length  = line.split()
+            chrom, length = line[:2].split()
             if length.isnumeric():
                 seq_lens[chrom] = length
     return seq_lens

@@ -6,11 +6,23 @@ covered by every input BED file will appear in the output file.
 
 Inputs/outputs may be unzipped or gzipped.
 
-Example:
-$ python merge_bedfiles.py -i input1.bed input2.bed.gz \
-    -o merged_file.bed.gz --union
+Usage
+-----
+$ python merge_bedfiles.py \
+   --union \
+   -i input1.bed input2.bed.gz \
+    -o merged_file.bed.gz
 
-Will raise an error if neither --union nor --intersect is given.
+Notes
+-----
+- Will raise an error if neither --union nor --intersect is given.
+
+- Chromosome numbers are checked for consistency. `chr22` and `22` are
+  consistent.
+
+- Chromosome number formats in output files will match the chromosome number 
+  format of the first input file (if the first input file has `chr22`, so will
+  the output).
 """
 
 import argparse
@@ -45,10 +57,21 @@ def get_args():
 
 
 def merge_bedfiles(in_fnames, out_fname, union=False, intersect=False):
-    """
-    """
-    if not union and not intersect:
+    if (not union and not intersect) or (union and intersect):
         raise ValueError("you must use either --union or --intersect")
+    regions_list = []
+    chroms = []
+    for in_fname in in_fnames:
+        regions, chrom = bgshr.Util.read_bedfile(in_fname, get_chrom=True)
+        regions_list.append(regions)
+        chroms.append(chrom)
+    assert len(set([c.lstrip("chr") for c in chroms])) == 1
+    chrom = chroms[0]
+    if intersect:
+        out_regions = bgshr.Util.intersect_elements(regions_list)
+    else:
+        out_regions = bgshr.Util.merge_elements(regions_list)
+    bgshr.Util.write_bedfile(out_fname, out_regions, chrom)
     return
 
 
@@ -64,3 +87,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

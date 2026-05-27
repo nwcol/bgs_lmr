@@ -1,0 +1,595 @@
+---
+title: "Pipeline for getting SFS data for sh deciles"
+author: "Gustavo V. Barroso"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+  toc: true
+number_sections: true
+toc_depth: 1
+---
+
+```{r setup, include=F, message=F, warning=F}
+knitr::opts_chunk$set(echo=TRUE)
+
+library(tidyverse)
+library(data.table)
+library(cowplot)
+library(biomaRt)
+library(reticulate)
+library(plyr)
+library(GenomicRanges)
+library(vcfR)
+library(foreach)
+library(doParallel)
+
+use_python("/usr/bin/python3")
+
+knitr::opts_knit$set(root.dir="~/Data/bgs_lmr/human_data/data/sfs_genes")
+```
+
+```{bash, mk-dirs, engine.opts='-i', include=T, eval=T, results=F, warning=F}
+
+source ~/.bashrc
+
+mkdir masks
+mkdir masks/bed
+mkdir roulette_lof_deciles
+mkdir roulette_lof_deciles/VEP_filtered
+mkdir roulette_lof_deciles/roulette_annotated
+mkdir roulette_lof_deciles/bed
+mkdir sfs_output
+```
+
+## Getting gene information
+
+Reads table with GeneBayes predictions and combines it with exonic coordinates
+
+```{r, info_genes, include=T, eval=T, results=F, message=F, warning=T}
+
+# https://www.nature.com/articles/s41588-024-01820-9
+sh_table <- fread("other/ZengEtAl2024NatGen.csv")
+names(sh_table)[1] <- "ensembl_gene_id"
+sh_table <- filter(sh_table, chrom!="chrX", chrom!="chrY")
+
+archives <- listEnsemblArchives()
+
+ensembl_human <- useMart(biomart="ENSEMBL_MART_ENSEMBL", 
+                         dataset="hsapiens_gene_ensembl",
+                         host="https://oct2024.archive.ensembl.org")
+
+ccds_genes <- getBM(mart=ensembl_human, 
+                    filters=c("chromosome_name", "with_ccds"), 
+                    values=list(c(1:22), T),
+                    attributes=c("ensembl_gene_id", 
+                                 "ensembl_exon_id",
+                                 "ensembl_transcript_id",
+                                 "chromosome_name",
+                                 "transcript_start",
+                                 "transcript_end",
+                                 "exon_chrom_start", 
+                                 "exon_chrom_end",
+                                 "5_utr_start",
+                                 "5_utr_end",
+                                 "3_utr_start",
+                                 "3_utr_end",
+                                 "cds_start",
+                                 "cds_end",
+                                 "cds_length",
+                                 "strand")) 
+
+pred_genes <- getBM(mart=ensembl_human, 
+                    filters=c("chromosome_name"), 
+                    values=list(1:22),
+                    attributes=c("ensembl_gene_id", 
+                                 "ensembl_exon_id",
+                                 "ensembl_transcript_id",
+                                 "chromosome_name",
+                                 "transcript_start",
+                                 "transcript_end",
+                                 "exon_chrom_start", 
+                                 "exon_chrom_end",
+                                 "5_utr_start",
+                                 "5_utr_end",
+                                 "3_utr_start",
+                                 "3_utr_end",
+                                 "cds_start",
+                                 "cds_end",
+                                 "cds_length",
+                                 "strand")) 
+
+fwrite(ccds_genes, "ccds_genes_hg38.csv")
+fwrite(pred_genes, "pred_genes_hg38.csv")
+
+ccds_genes <- fread("ccds_genes_hg38.csv")
+pred_genes <- fread("pred_genes_hg38.csv")
+
+# decides which set of genes to use
+used_genes <- ccds_genes # ccds (VEP assigns too many MODIFIER sites otherwise)
+
+# the goal is to have a BED file with positions that are CDS in SOME transcript
+exon_singletons <- used_genes[!duplicated(used_genes$ensembl_exon_id),]
+
+length(unique(exon_singletons$ensembl_gene_id))
+length(unique(used_genes$ensembl_gene_id))
+
+# focus on exons on the tail(s) of each gene
+tails <- exon_singletons[!is.na(exon_singletons$`5_utr_start`) |
+                         !is.na(exon_singletons$`3_utr_start`),]
+tails_pos_strand <- filter(tails, strand==1) # positive strand 5'->3'
+tails_neg_strand <- filter(tails, strand==-1) # negative strand 3'->5'
+
+# clipping exon starts
+tails_pos_strand[!is.na(tails_pos_strand$`5_utr_end`),]$exon_chrom_start <- 
+  tails_pos_strand[!is.na(tails_pos_strand$`5_utr_end`),]$`5_utr_end`
+tails_pos_strand[!is.na(tails_pos_strand$`3_utr_start`),]$exon_chrom_end <- 
+  tails_pos_strand[!is.na(tails_pos_strand$`3_utr_start`),]$`3_utr_start`
+
+tails_neg_strand[!is.na(tails_neg_strand$`3_utr_end`),]$exon_chrom_start <- 
+  tails_neg_strand[!is.na(tails_neg_strand$`3_utr_end`),]$`3_utr_end`
+tails_neg_strand[!is.na(tails_neg_strand$`5_utr_start`),]$exon_chrom_end <- 
+  tails_neg_strand[!is.na(tails_neg_strand$`5_utr_start`),]$`5_utr_start`
+
+# putting it back together
+new_tails <- rbind.data.frame(tails_pos_strand, tails_neg_strand)
+length(unique(new_tails$ensembl_exon_id)) == nrow(new_tails)
+
+inner_exons <- filter(used_genes, !(ensembl_exon_id %in% new_tails$ensembl_exon_id))
+unique_inner_exons <- filter(inner_exons, !duplicated(ensembl_exon_id))
+clipped_genes <- rbind.data.frame(new_tails, unique_inner_exons)
+clipped_genes <- filter(clipped_genes, exon_chrom_start!=exon_chrom_end)
+
+nrow(clipped_genes) == length(unique(clipped_genes$ensembl_exon_id))
+length(unique(clipped_genes$ensembl_gene_id))
+
+clipped_genes <- dplyr::arrange(.data=clipped_genes, 
+                                chromosome_name,
+                                ensembl_gene_id, 
+                                ensembl_transcript_id,
+                                exon_chrom_start,
+                                exon_chrom_end)
+
+genes_sh <- merge(clipped_genes, sh_table, by="ensembl_gene_id")
+genes_sh <- dplyr::arrange(.data=genes_sh, chromosome_name, exon_chrom_start)
+sum(genes_sh$exon_chrom_end - genes_sh$exon_chrom_start)
+length(unique(genes_sh$ensembl_gene_id))
+
+# check if we are losing genes when merging with the Zeng et al table
+length(unique(ccds_genes$ensembl_gene_id)) # ccds genes from ensembl
+length(unique(clipped_genes$ensembl_gene_id)) # same, after trimming exon ends
+length(unique(sh_table$ensembl_gene_id)) # zeng et al table for autosomes
+length(unique(genes_sh$ensembl_gene_id)) # merged table
+
+clipped_leftover <- dplyr::filter(clipped_genes, !ensembl_gene_id %in% genes_sh$ensembl_gene_id)
+length(unique(clipped_leftover$ensembl_gene_id))
+
+ccds_clipped_leftover <- filter(clipped_leftover, ensembl_gene_id %in% ccds_genes$ensembl_gene_id)
+# 757 ccds genes not in the Zeng table
+length(unique(ccds_clipped_leftover$ensembl_gene_id)) 
+
+# including genes not in Zeng table as 11th decile, but only those with CCDS
+ccds_clipped_leftover$hgnc <- NA
+ccds_clipped_leftover$chrom <- NA
+ccds_clipped_leftover$obs_lof <- NA
+ccds_clipped_leftover$exp_lof <- NA
+ccds_clipped_leftover$prior_mean <- NA
+ccds_clipped_leftover$post_mean <- NA
+ccds_clipped_leftover$post_lower_95 <- NA
+ccds_clipped_leftover$post_upper_95 <- NA
+ccds_clipped_leftover$decile_constraint <- 11 # 11th decile 
+
+genes_sh_ext <- rbind.data.frame(genes_sh, ccds_clipped_leftover)
+genes_sh_ext <- dplyr::arrange(.data=genes_sh_ext, 
+                               chromosome_name, 
+                               exon_chrom_start)
+length(unique(genes_sh$ensembl_gene_id)) 
+length(unique(genes_sh_ext$ensembl_gene_id)) # 18322 = 17565 + 757
+genes_sh_ext <- filter(genes_sh_ext, exon_chrom_start!=exon_chrom_end)
+
+sum(genes_sh$exon_chrom_end - genes_sh$exon_chrom_start)
+sum(genes_sh_ext$exon_chrom_end - genes_sh_ext$exon_chrom_start)
+sum(ccds_clipped_leftover$exon_chrom_end - ccds_clipped_leftover$exon_chrom_start)
+
+# 724 genes in the Zeng et al table not in the ccds genes from Ensembl
+zeng_leftover <- filter(sh_table, !ensembl_gene_id %in% genes_sh_ext$ensembl_gene_id)
+nrow(zeng_leftover) # we will discard these, as there are no start, end coords.
+
+fwrite(genes_sh_ext, "genes_sh_deciles_hg38.csv", sep=",")
+genes_sh_ext <- fread("genes_sh_deciles_hg38.csv")
+
+# sum of gene lengths per decile
+cds_decile <- cbind.data.frame(rep(0, 11), rep(0, 11))
+names(cds_decile) <- c("sum_cds", "num_genes")
+cds_decile$decile <- 1:11
+
+for(c in unique(genes_sh_ext$chromosome_name)) {
+  for(d in unique(genes_sh_ext$decile_constraint)) {
+    tbl <- dplyr::filter(genes_sh_ext, chromosome_name==c, decile_constraint==d)
+    df <- dplyr::select(tbl, c("chromosome_name",
+                               "exon_chrom_start",
+                               "exon_chrom_end"))
+    
+    gr <- makeGRangesFromDataFrame(df, keep.extra.columns=T) # GR is 1-based
+    df <- as.data.table(reduce(gr)) # remove overlaps
+    df <- dplyr::select(df, c(seqnames, start, end))
+    names(df) <- c("#chrom", "start", "end")
+    
+    # increments sum for each chr
+    cds_decile$sum_cds[d] <- cds_decile$sum_cds[d] + sum(df$end - df$start) 
+    cds_decile$num_genes[d] <- cds_decile$num_genes[d] + 
+                               length(unique(tbl$ensembl_gene_id))
+      
+    # to 0-based, half-open intervals
+    df$start <- df$start - 1 
+    
+    fwrite(df, paste("~/Data/bgs_lmr/human_data/data/sfs_genes/masks/bed/exons_",
+                     "lof_d", d, "_chr", c, ".bed.gz", sep=""), sep="\t")
+  }
+}
+
+plot(x=cds_decile$decile, y=cds_decile$num_genes,
+     ylab="num genes", xlab="decile")
+plot(x=cds_decile$decile, y=cds_decile$sum_cds / cds_decile$num_genes,
+     ylab="avg gene lengths", xlab="decile")
+```
+
+## NYGC VCF files
+
+NYGC high-coverage resequencing of 1kGP samples. 
+Reference: Byrska-Bishop et al 2022, Cell
+
+Downloaded on February 27 2025 and stored in:
+/media/gvbarroso/extradrive1/bgs_lmr/human_data/data/1kGP
+
+```{bash, vcf-download, engine.opts='-i', include=T, eval=T, results=F, warning=F}
+
+source ~/.bashrc
+
+for c in {1..22};
+  wget https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV/1kGP_high_coverage_Illumina.chr$c.filtered.SNV_INDEL_SV_phased_panel.vcf.gz
+done
+```
+
+We are keeping bi-allelic SNPs for YRI and CEU populations
+
+```{bash, vcf-filter, engine.opts='-i', include=T, eval=T, results=F, warning=F}
+
+source ~/.bashrc
+
+for c in {1..22}; 
+  bcftools view -v snps \
+  1kGP_high_coverage_Illumina.chr$c.filtered.SNV_INDEL_SV_phased_panel.vcf.gz \
+  -S ../yri_samples.txt | bgzip > 1kGP_YRI_filtered_SNPS_chr$c.vcf.gz
+  bcftools view -v snps \
+  1kGP_high_coverage_Illumina.chr$c.filtered.SNV_INDEL_SV_phased_panel.vcf.gz \
+  -S ../ceu_samples.txt | bgzip > 1kGP_CEU_filtered_SNPS_chr$c.vcf.gz
+done
+```
+
+## Roulette mutation maps (also VCF format)
+
+Downloading and processing
+
+```{bash, roulette-dl, engine.opts='-i', include=T, eval=T, results=F, warning=F}
+
+source ~/.bashrc
+
+for c in {1..22};
+  wget http://genetics.bwh.harvard.edu/downloads/Vova/Roulette/${c}_rate_v5.2_TFBS_correction_all.vcf.bgz
+  zcat ${c}_rate_v5.2_TFBS_correction_all.vcf.gz | \
+  bgzip > chr${c}_rate_v5.2_TFBS_correction_all.vcf.gz
+  tabix chr${c}_rate_v5.2_TFBS_correction_all.vcf.gz
+  
+  bcftools view -h chr${c}_rate_v5.2_TFBS_correction_all.vcf.gz | \
+  sed '31i ##FILTER=<ID=high,Description="High quality variant; FILTER created by GVB on Apr 23 2025 to prevent errors when annotating the Roulette maps with VEP">' > hdr.txt
+  bcftools reheader -h hdr.txt chr${c}_rate_v5.2_TFBS_correction_all.vcf.gz > \
+  chr${c}_rate_v5.2_TFBS_correction_all_newheader.vcf.gz
+  tabix chr${c}_rate_v5.2_TFBS_correction_all_newheader.vcf.gz
+done
+```
+
+Intersecting Roulette map and exons in sh deciles (LOF/sh)
+
+```{bash, roulette-mask, engine.opts='-i', include=T, eval=T, results=F, warning=F}
+
+source ~/.bashrc
+
+for c in {1..22}; do
+  for d in {1..11}; do
+    bcftools view /media/gvbarroso/Elements/Data/Roulette_hg38/vcf_files/chr${c}_rate_v5.2_TFBS_correction_all_newheader.vcf.gz \
+    -R masks/bed/${c}_exons_lof_d${d}.tsv.gz | \
+    bgzip > roulette_lof_deciles/roulette_chr${c}_lof_d${d}.vcf.gz;
+  done
+done
+
+for f in roulette_lof_deciles/roulette_chr*; do tabix "$f"; done
+```
+
+Annotating Roulette maps
+
+```{bash, roulette-mask, engine.opts='-i', include=T, eval=T, results=F, warning=F}
+
+source ~/.bashrc
+
+for c in {1..22}; do
+  for d in {1..11}; do
+    ./vep --cache -i roulette_lof_deciles/roulette_chr${c}_lof_d${d}.vcf.gz \
+    -o roulette_lof_deciles/vep_roulette_chr${c}_lof_d${d}.tsv
+    gzip roulette_lof_deciles/vep_roulette_chr${c}_lof_d${d}.tsv
+  done
+done
+
+mkdir VEP_output
+mv roulette_lof_deciles/vep_roulette_chr* VEP_output
+```
+
+Now we filter the VEP output by selecting the strongest consequence from each
+possible mutation.
+
+```{r, filter-vep-out, include=T, eval=T, results=F, warning=F}
+
+# commented-out code perform decile loop in parallel, but uses a lot of memory
+pb <- txtProgressBar(min=0, max=22, style=3)
+for(c in 1:22) {
+  setTxtProgressBar(pb, c)
+  #cluster <- makeCluster(11)
+  #registerDoParallel(cluster)
+  #foreach(d = 1:11) %dopar% {
+  for (d in 1:11) {
+    fin <- paste("VEP_output/vep_roulette_chr", c, 
+                 "_lof_d", d, ".tsv.gz", sep="")
+    vep <- fread(paste("roulette_lof_deciles/", fin, sep=""), header=T)
+
+    vep$POS <- as.integer(str_split_i(vep$`#Uploaded_variation`, 
+                                      "_", 2))
+    vep$REF <- str_split_i(str_split_i(vep$`#Uploaded_variation`, 
+                                       "_", 3), "/", 1)
+    vep$VEP <- str_split_i(str_split_i(vep$Extra, ";", 1), "=", 2)
+    vep$CHROM <- c
+    vep <- dplyr::select(vep, c(CHROM, POS, REF, Allele, Gene, Feature, VEP))
+    vep$Score <- as.integer(mapvalues(vep$VEP, c("MODIFIER", 
+                                                 "LOW", 
+                                                 "MODERATE", 
+                                                 "HIGH"), 1:4))
+    
+    vep_filtered <- vep %>%
+                    group_by(POS, Allele) %>% 
+                    dplyr::filter(., Score==max(Score)) %>%
+                    distinct(POS, Allele, .keep_all=TRUE)
+    
+    table(vep$VEP) # prior to filtering and uniquing
+    table(vep_filtered$VEP) # after filtering and uniquing
+    
+    names(vep_filtered)[which(names(vep_filtered)=="Allele")] <- "ALT"
+    vep_filtered <- dplyr::select(vep_filtered, c(CHROM, POS, REF, ALT, VEP))
+    
+    vep_high <- filter(vep_filtered, VEP=="HIGH") # LOF
+    vep_mod <- filter(vep_filtered, VEP=="MODERATE") # nonsynonymous
+    vep_low <- filter(vep_filtered, VEP=="LOW") # synonymous
+
+    # writing uncompressed files as they will be bgzip-ed
+    fout <- paste("vep_LOW_chr", c, "_d", d, ".tsv", sep="")
+    fwrite(vep_low, paste("roulette_lof_deciles/VEP_filtered/", fout, sep=""),
+           sep="\t", col.names=F)
+    
+    fout <- paste("vep_MODERATE_chr", c, "_d", d, ".tsv", sep="")
+    fwrite(vep_mod, paste("roulette_lof_deciles/VEP_filtered/", fout, sep=""),
+           sep="\t", col.names=F)
+    
+    fout <- paste("vep_HIGH_chr", c, "_d", d, ".tsv", sep="")
+    fwrite(vep_high, paste("roulette_lof_deciles/VEP_filtered/", fout, sep=""),
+           sep="\t", col.names=F)
+  }
+  # recycle
+  #stopCluster(cl = cluster)
+}
+close(pb)
+```
+
+Adding INFO field to Roulette VCFs based on VEP impact
+
+```{bash, annotate-roulette, engine.opts='-i', include=T, eval=T, results=F, warning=F}
+
+source ~/.bashrc
+
+cd roulette_lof_deciles/VEP_filtered
+echo "##INFO=<ID=VEP,Number=1,Type=String,Description=VEP-predicted impact" \
+     > header.txt
+for f in vep_*; do bgzip $f; done
+for f in *.tsv.gz; do tabix -s1 -b2 -e2 $f; done
+cd ..
+
+for c in {1..22}; do 
+  for d in {1..11}; do 
+    bcftools annotate \
+    -a VEP_filtered/vep_HIGH_chr${c}_d${d}.tsv.gz \
+    roulette_chr${c}_lof_d${d}.vcf.gz \
+    -c CHROM,POS,REF,ALT,VEP \
+    -h VEP_filtered/header.txt | bgzip -c > \
+    roulette_annotated/roulette_chr${c}_lof_d${d}_vep_HIGH.vcf.gz
+    
+    bcftools annotate \
+    -a VEP_filtered/vep_MODERATE_chr${c}_d${d}.tsv.gz \
+    roulette_chr${c}_lof_d${d}.vcf.gz \
+    -c CHROM,POS,REF,ALT,VEP \
+    -h VEP_filtered/header.txt | bgzip -c > \
+    roulette_annotated/roulette_chr${c}_lof_d${d}_vep_MODERATE.vcf.gz
+    
+    bcftools annotate \
+    -a VEP_filtered/vep_LOW_chr${c}_d${d}.tsv.gz \
+    roulette_chr${c}_lof_d${d}.vcf.gz \
+    -c CHROM,POS,REF,ALT,VEP \
+    -h VEP_filtered/header.txt | bgzip -c > \
+    roulette_annotated/roulette_chr${c}_lof_d${d}_vep_LOW.vcf.gz
+  done
+done
+
+for f in roulette_annotated/roulette_chr*; do tabix "$f"; done
+for f in roulette_annotated/roulette_chr*; do bcftools view "$f"; done # ?
+
+cd roulette_annotated
+
+# stores headers as separate files (not used in the current version of pipeline)
+for c in {1..22}; do 
+  for d in {1..11}; do 
+    bcftools view -h roulette_chr${c}_lof_d${d}_vep_LOW.vcf.gz > \
+    roulette_chr${c}_lof_d${d}_vep_LOW_header.txt
+    
+    bcftools view -h roulette_chr${c}_lof_d${d}_vep_MODERATE.vcf.gz > \
+    roulette_chr${c}_lof_d${d}_vep_MODERATE_header.txt
+    
+    bcftools view -h roulette_chr${c}_lof_d${d}_vep_HIGH.vcf.gz > \
+    roulette_chr${c}_lof_d${d}_vep_HIGH_header.txt
+  done
+done
+
+cd ..
+```
+
+Filtering roulette VCFs based on VEP impact to get U and L per decile per impact
+
+```{r, filter-roulette, include=T, eval=T, results=F, warning=F}
+
+# https://github.com/vseplyarskiy/Roulette/tree/main/adding_mutation_rate
+roulette_scale <- 1.015e-7 / 2 # factor of 2 because it's per diploid genome
+
+vep_classes <- c("LOW", "MODERATE", "HIGH")
+
+L_d <- cbind.data.frame(rep(0, 11), rep(0, 11), rep(0, 11))
+names(L_d) <- vep_classes
+
+U_d <- cbind.data.frame(rep(0, 11), rep(0, 11), rep(0, 11))
+names(U_d) <- vep_classes
+
+# flip the order of the nested loop to get avg mutation rate per decile
+pb <- txtProgressBar(min=0, max=11, style=3)
+for(d in 1:11) { 
+
+  setTxtProgressBar(pb, d)
+  
+  mus_d <- c(0, 0, 0) 
+  names(mus_d) <- vep_classes
+  
+  nsites_d <- c(0, 0, 0) 
+  names(nsites_d) <- vep_classes
+  
+  for(i in 1:length(vep_classes)) { 
+    ip <- vep_classes[i]
+    pattern <- paste("VEP", ip, sep="=")
+
+    idx <- which(names(mus_d) == ip)
+    
+    for(c in 1:22) { 
+      vcf <- fread(paste("roulette_lof_deciles/roulette_annotated/",
+                          paste("roulette_chr", c, 
+                                 "_lof_d", d, 
+                                 "_vep_", ip, 
+                                 ".vcf.gz", sep=""), sep="")) 
+      
+      vcf <- dplyr::filter(vcf, grepl(pattern, INFO))
+  
+      # gets roulette mutation rates 
+      mr <- str_split_i(vcf$INFO, ";", 2)
+      mr <- as.numeric(str_split_i(mr, "=", 2)) * roulette_scale
+      mus_d[idx] <- mus_d[idx] + sum(mr) # mu * L
+      
+      nsites_d[idx] <- nsites_d[idx] + length(unique(vcf$POS)) # L
+    }
+  }
+  
+  L_d[d,] <- nsites_d
+  U_d[d,] <- mus_d
+}
+close(pb)
+
+# mu * L and L, summed across chromosomes
+fwrite(U_d, "~/Data/bgs_lmr/human_data/data/sfs_genes/sfs_output/U_d.csv") 
+fwrite(L_d, "~/Data/bgs_lmr/human_data/data/sfs_genes/sfs_output/L_d.csv") 
+```
+
+We now filter NYG VCFs based on predicted impact of REF->ALT mutation
+
+```{r, filter-NYG-VCFs, include=T, eval=T, results=F, warning=F}
+
+for(c in 1:22) {
+  cat(paste("chromosome", c, "\n"))
+  
+  data_1kgp <- fread(paste("/media/gvbarroso/extradrive1/bgs_lmr/human_data/data/1kGP/",
+                     paste("1kGP_CEU_filtered_SNPS_chr", c, ".vcf.gz", sep=""), 
+                     sep=""), skip=112) # %>% dplyr::select(c(1,2,4,5))
+  
+  for(d in 1:11) {
+    cat(paste("decile", d, "\n"))
+    
+    # selecting only columns we need to intersect
+    rlt_vep_L <- fread(paste("roulette_lof_deciles/roulette_annotated/",
+                             paste("roulette_chr", c, 
+                                   "_lof_d", d, 
+                                   "_vep_LOW", 
+                                   ".vcf.gz", sep=""), sep="")) %>%
+                 dplyr::filter(., grepl("VEP=LOW", INFO)) %>%
+                 dplyr::select(., c(POS, REF, ALT)) 
+    
+    rlt_vep_M <- fread(paste("roulette_lof_deciles/roulette_annotated/",
+                             paste("roulette_chr", c, 
+                                   "_lof_d", d, 
+                                   "_vep_MODERATE", 
+                                   ".vcf.gz", sep=""), sep="")) %>%
+                 dplyr::filter(., grepl("VEP=MODERATE", INFO)) %>%
+                 dplyr::select(., c(POS, REF, ALT))
+    
+    rlt_vep_H <- fread(paste("roulette_lof_deciles/roulette_annotated/",
+                             paste("roulette_chr", c, 
+                                   "_lof_d", d, 
+                                   "_vep_HIGH", 
+                                   ".vcf.gz", sep=""), sep="")) %>%
+                 dplyr::filter(., grepl("VEP=HIGH", INFO)) %>%
+                 dplyr::select(., c(POS, REF, ALT)) 
+          
+    vcf_L <- inner_join(data_1kgp, rlt_vep_L, by=c("POS", "REF", "ALT"))
+    vcf_M <- inner_join(data_1kgp, rlt_vep_M, by=c("POS", "REF", "ALT"))
+    vcf_H <- inner_join(data_1kgp, rlt_vep_H, by=c("POS", "REF", "ALT"))
+    
+    # writing headless VCF files
+    fwrite(vcf_L, paste("~/Data/bgs_lmr/human_data/data/sfs_genes/filtered_vcfs/",
+                        "1kGP_CEU_chr", c, "_d", d, "_VEP_LOW.vcf.gz", sep=""),
+           sep="\t")
+    
+    fwrite(vcf_M, paste("~/Data/bgs_lmr/human_data/data/sfs_genes/filtered_vcfs/",
+                        "1kGP_CEU_chr", c, "_d", d, "_VEP_MODERATE.vcf.gz", sep=""),
+           sep="\t")
+    
+    fwrite(vcf_H, paste("~/Data/bgs_lmr/human_data/data/sfs_genes/filtered_vcfs/",
+                        "1kGP_CEU_chr", c, "_d", d, "_VEP_HIGH.vcf.gz", sep=""),
+           sep="\t")
+    
+    low <- vcf_L$POS
+    mid <- vcf_M$POS
+    high <- vcf_H$POS
+    
+    # to have an idea of the intersection that results from positions being
+    # listed twice in the VCF files (although some are invariant)
+    cat(paste(length(intersect(low, mid))), "-")
+    cat(paste(length(intersect(low, high))), "-")
+    cat(paste(length(intersect(mid, high))), "-")
+    cat("\n")
+  }
+}
+```
+
+This python chunk was run as a script from outside this Rmd file
+
+```{python, compute-SFS, engine.opts='-i', include=T, eval=T, results=F, warning=F}
+
+import moments
+
+for c in range(1,23):
+  for d in range(1,12):
+    for v in ["LOW", "MODERATE", "HIGH"]:
+      for pop in ["YRI", "CEU"]:
+        fout=f"sfs_output/sfs_{pop}_chr{c}_d{d}_VEP_{v}.sfs"
+        vcfin=f"/media/gvbarroso/extradrive1/bgs_lmr/human_data/data/1kGP/1kGP_{pop}_filtered_SNPS_chr{c}.vcf.gz"
+        bedin=f"~/Data/bgs_lmr/human_data/data/sfs_genes/roulette_lof_deciles/bed/chr{c}_lof_d{d}_VEP_{v}.bed"
+        sfs=moments.Spectrum.from_vcf(vcfin, bed_file=bedin, folded=True)
+        sfs.to_file(fout)
+```

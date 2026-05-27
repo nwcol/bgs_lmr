@@ -24,3 +24,9 @@ Created with [compute\_site\_counts.ipynb](../tools/compute_site_counts.ipynb)
 [U\_tbl.csv](U_tbl.csv): A table of mutation rates for each class of
 constrained elements, for each mutation/model chromosome combination.
 Created with [compute\_U.ipynb](../tools/compute_U.ipynb).
+
+[hg19ToHg38.over.chain](hg19ToHg38.over.chain): UCSC Chain file hg19 to hg38, used to lift over genomic coordinates.
+ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/liftOver/hg19ToHg38.over.chain.gz
+
+[Gilbert2020_AOV.csv](Gilbert2020_AOV.csv): Candidate 2 Mb genomic regions to experience associate over dominance.
+Available in Gilbert et al 2020. Transition from Background Selection to Associative Overdominance Promotes Diversity in Regions of Low Recombination.

@@ -43,7 +43,7 @@ rule parse_mutation_map:
         info_field = get_mut_model_info_tag("{mut}")
     shell:
         """
-        python scripts/parse_roulette_vcf.py \
+        python py_scripts/parse_roulette_vcf.py \
             -i {input} \
             -o {output} \
             --field {params.info_field} \
@@ -105,7 +105,7 @@ rule parse_mutation_map_coverage:
         "../data/masks/{mut}_coverage/mask_chr{chrom}.bed.gz"
     shell:
         """
-        python scripts/parse_mutation_map_coverage.py \
+        python py_scripts/parse_mutation_map_coverage.py \
             -i {input} \
             -o {output} \
             --chrom {params.chrom}
@@ -121,7 +121,7 @@ rule merge_masks:
         "../data/masks/strict_{mut}/mask_chr{chrom}.bed.gz"
     shell:
         """
-        python scripts/merge_bedfiles.py \
+        python py_scripts/merge_bedfiles.py \
             -i {input} \
             -o {output} \
             --intersect
@@ -162,7 +162,7 @@ rule parse_gvcf:
         prefix = config["allele_count_dir"] + "{sample}_allele_counts"
     shell:
         """
-        python scripts/parse_gvcf.py \
+        python py_scripts/parse_gvcf.py \
             -i {input.gvcf} \
             -o {params.prefix} \
             -g {input.genome_file} \
@@ -181,7 +181,7 @@ rule sum_allele_counts:
         "../data/allele_count_arrays/allele_counts_YRI_chr{chrom}.npy"
     shell:
         """
-        python scripts/sum_allele_count_arrays.py \
+        python py_scripts/sum_allele_count_arrays.py \
             -i {input} \
             -o {output}
         """
@@ -196,7 +196,7 @@ rule compute_ndns:
         "../data/ndns_arrays/ndns_YRI_chr{chrom}.npy"
     shell:
         """
-        python scripts/build_ndns_array.py \
+        python py_scripts/build_ndns_array.py \
             -i {input} \
             -o {output}
         """
@@ -212,7 +212,7 @@ rule build_pi_tables:
         "../data/pi_tables/{mut}/pi_tbl_YRI_chr{chrom}.csv.gz"
     shell:
         """
-        python scripts/build_pi_table.py \
+        python py_scripts/build_pi_table.py \
             -i {input.ndns} \
             --mask {input.mask} \
             -o {output}
@@ -246,7 +246,7 @@ rule build_10kb_tables:
         "../models/tables_10kb/{dem}/{con}/{mut}/B_tbl_YRI_chr{c}_10kb.csv.gz"
     shell:
         """
-        python scripts/build_B_table.py \
+        python py_scripts/build_B_table.py \
             -i {input.pred_tbl} \
             -pi {input.pi_tbl} \
             -b {input.band_tbl} \
@@ -255,7 +255,7 @@ rule build_10kb_tables:
 
 
 rule build_1kb_B_maps:
-    # Invokes scripts/build_B_map.py to build fine-scale (1kb) B-maps, by
+    # Invokes py_scripts/build_B_map.py to build fine-scale (1kb) B-maps, by
     # extracting the `B` column from 1kb tables in ../local_models/.
     input:
         "../local_models/tables_1kb/{dem}/{con}/{mut}/{con}_{mut}_chr{c}.csv.gz"
@@ -263,6 +263,6 @@ rule build_1kb_B_maps:
         "../models/B_maps_1kb/{dem}/{con}/{mut}/B_map_YRI_chr{c}_1kb.csv.gz"
     shell:
         """
-        python scripts/build_B_map.py -i {input} -o {output}
+        python py_scripts/build_B_map.py -i {input} -o {output}
         """
 

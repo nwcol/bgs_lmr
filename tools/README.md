@@ -5,7 +5,9 @@
 
 ### Input data not included in the Snakefile
 
-...
+Functional/phylogenetic conservation annotations within
+[../data/annotations](../data/annotations) are not included in the Snakefile,
+but are hosted in this repository.
 
 ### Preparing input data
 
@@ -58,7 +60,6 @@ intersects covered intervals with 1KG strict mask intervals.
 #### Diversity data
 
 We estimate diversity from sample-specific GVCF files.
-
 To reproduce the diversity dataset, download the files corresponding to 108
 YRI samples (listed in [YRI\_sample\_ids.txt](../config/YRI_sample_ids.txt)) from
 http://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data\_collections/1000G\_2504\_high\_coverage/working/20190425\_NYGC\_GATK/raw\_calls\_updated/

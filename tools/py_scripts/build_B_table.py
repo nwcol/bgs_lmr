@@ -53,7 +53,7 @@ def get_centromere(band_fname, chrom):
     Get upper and lower bounds of the `acen` annotation from
     cytoBand.txt.
     """
-    band_df = pandas.read_csv("../data/cytoBand.txt", sep="\t",
+    band_df = pandas.read_csv(band_fname, sep="\t",
         names=["chrom", "start", "end", "band", "stain"])
     sub_df = band_df[band_df["chrom"] == f"chr{chrom}"]
     start = np.min(sub_df[sub_df["stain"] == "acen"]["start"])

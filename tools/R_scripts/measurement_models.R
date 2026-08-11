@@ -6,7 +6,7 @@
 #
 #################
 
-source("~/Data/bgs_lmr/human_data/tools/HelperFunctions.R")
+source("~/Devel/bgs_lmr/tools/Rscripts/HelperFunctions.R")
 
 constrained_models <- c("merged_cds_phastcons", "split_cds_phastcons", "split_cds_regulatory", "merged_cds_regulatory")
 

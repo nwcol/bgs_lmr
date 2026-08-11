@@ -284,8 +284,9 @@ p_100kb <- ggplot(dat_100kb, aes(x = chromStart / 1e6)) + theme_classic() +
         axis.title.y = element_text(size = 22),
         axis.title.x = element_text(size = 20),
         legend.text = element_text(size = 14),
-        legend.position="none")
+        legend.position="bottom")
 save_plot("plots/chr22_100kb.pdf", p_100kb, base_height=6, base_width=15)
+p_100kb <- p_100kb + theme(legend.position="none")
 p <- plot_grid(p_1Mb, p_100kb, nrow=2, rel_heights=c(1, 1.15), labels="AUTO", align="v")
 save_plot("plots/human_diversity_chr8_chr22.pdf", p, base_height=9, base_width=15)
 

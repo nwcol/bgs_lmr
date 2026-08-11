@@ -1,5 +1,12 @@
 
-source("~/Data/bgs_lmr/human_data/tools/HelperFunctions.R")
+#################
+# 
+# This script uses prepared tables to build SEMs 
+# NOTE: this script should be run from within each models dir
+#
+#################
+
+source("~/Devel/bgs_lmr/tools/Rscripts/HelperFunctions.R")
 
 constrained_models <- c("split_cds_phastcons", "split_cds_regulatory")
 mutation_maps <- c("roulette")

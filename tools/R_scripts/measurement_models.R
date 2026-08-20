@@ -6,7 +6,7 @@
 #
 #################
 
-source("~/Devel/bgs_lmr/tools/Rscripts/HelperFunctions.R")
+source("~/Devel/bgs_lmr/tools/R_scripts/HelperFunctions.R")
 
 constrained_models <- c("merged_cds_phastcons", "split_cds_phastcons", "split_cds_regulatory", "merged_cds_regulatory")
 
@@ -529,9 +529,8 @@ for(m in constrained_models) {
   
   tmp_10kb <- filter(human_maps_10kb, constrained_model==m) %>% 
     dplyr::select(., c(chrom, chromStart, chromEnd, constrained_model, B, mut_map)) %>%
-    pivot_wider(., values_from=B, names_from=mut_map) 
-  
-  #b <- na.omit(tmp_10kb) %>% dplyr::select(., carlson, gnomad, roulette) %>% cor() # very high
+    pivot_wider(., values_from=B, names_from=mut_map) %>%
+    arrange(., chrom, chromStart, chromEnd)
   
   setDT(tmp_10kb)
   tmp_10kb_log <- tmp_10kb[,1:4]
@@ -541,7 +540,8 @@ for(m in constrained_models) {
   
   tmp_100kb <- filter(human_maps_100kb, constrained_model==m) %>%
     dplyr::select(., c(chrom, chromStart, chromEnd, constrained_model, B, mut_map)) %>%
-    pivot_wider(., values_from=B, names_from=mut_map) 
+    pivot_wider(., values_from=B, names_from=mut_map) %>%
+    arrange(., chrom, chromStart, chromEnd)
   
   setDT(tmp_100kb)
   tmp_100kb_log <- tmp_100kb[,1:4]
@@ -551,7 +551,8 @@ for(m in constrained_models) {
   
   tmp_1Mb <- filter(human_maps_1Mb, constrained_model==m) %>%
     dplyr::select(., c(chrom, chromStart, chromEnd, constrained_model, B, mut_map)) %>%
-    pivot_wider(., values_from=B, names_from=mut_map) 
+    pivot_wider(., values_from=B, names_from=mut_map) %>%
+    arrange(., chrom, chromStart, chromEnd)
   
   setDT(tmp_1Mb)
   tmp_1Mb_log <- tmp_1Mb[,1:4]
@@ -567,7 +568,8 @@ for(m in constrained_models) {
   loadings <- pc$vectors[, 1]
   Z <- scale(tmp_10kb_log[, ..vars])
   
-  pc1_raw <- as.vector(Z %*% loadings)
+  pc1_raw <- rowSums(sweep(Z, 2, loadings, `*`), na.rm=TRUE) /
+    rowSums(!is.na(Z) * abs(loadings))
   ref <- tmp_10kb_log$roulette
   sgn <- sign(cor(pc1_raw, ref, use = "complete.obs"))
   tmp_10kb_log$B_latent_log <- as.numeric(pc1_raw) * sgn
@@ -583,7 +585,8 @@ for(m in constrained_models) {
   loadings <- pc$vectors[, 1]
   Z <- scale(tmp_100kb_log[, ..vars])
   
-  pc1_raw <- as.vector(Z %*% loadings)
+  pc1_raw <- rowSums(sweep(Z, 2, loadings, `*`), na.rm=TRUE) /
+    rowSums(!is.na(Z) * abs(loadings))
   ref <- tmp_100kb_log$roulette
   sgn <- sign(cor(pc1_raw, ref, use = "complete.obs"))
   tmp_100kb_log$B_latent_log <- as.numeric(pc1_raw) * sgn
@@ -599,7 +602,8 @@ for(m in constrained_models) {
   loadings <- pc$vectors[, 1]
   Z <- scale(tmp_1Mb_log[, ..vars])
   
-  pc1_raw <- as.vector(Z %*% loadings)
+  pc1_raw <- rowSums(sweep(Z, 2, loadings, `*`), na.rm=TRUE) /
+    rowSums(!is.na(Z) * abs(loadings))
   ref <- tmp_1Mb_log$roulette
   sgn <- sign(cor(pc1_raw, ref, use = "complete.obs"))
   tmp_1Mb_log$B_latent_log <- as.numeric(pc1_raw) * sgn

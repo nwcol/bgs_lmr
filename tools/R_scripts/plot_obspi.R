@@ -6,7 +6,7 @@
 #
 #################
 
-source("~/Devel/bgs_lmr/tools/Rscripts/HelperFunctions.R")
+source("~/Devel/bgs_lmr/tools/R_scripts/HelperFunctions.R")
 
 constrained_models <- c("split_cds_phastcons", "split_cds_regulatory")
 mutation_maps <- c("carlson", "gnomad", "roulette")
@@ -1425,10 +1425,15 @@ for(dag in 3:4) {
 chr_r2_1Mb$scale <- 1e+6
 
 chr_r2_DAGs34 <- rbind.data.frame(chr_r2_10kb, chr_r2_100kb, chr_r2_1Mb)
+chr_r2_DAGs34$constrained_model <- factor(chr_r2_DAGs34$constrained_model, 
+                                        levels = names(elem_labels), 
+                                        labels = unname(elem_labels)) 
 
 chr_r2_ext_DAGs34 <- left_join(chr_r2_DAGs34, 
                                chr_fitmeasures_latent,
                                by=c("chrom", "DAG", "constrained_model",  "scale"))
+
+fwrite(chr_r2_ext_DAGs34, "sem/chr_r2_ext_DAGs34.csv")
 
 p <- ggplot(data=chr_r2_ext_DAGs34, aes(x=chrom, y=avg_pi * 100, color=as.factor(DAG))) +
   geom_point(size=3) + theme_classic() + 

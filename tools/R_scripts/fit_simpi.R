@@ -6,7 +6,7 @@
 #
 #################
 
-source("~/Devel/bgs_lmr/tools/Rscripts/HelperFunctions.R")
+source("~/Devel/bgs_lmr/tools/R_scripts/HelperFunctions.R")
 
 constrained_models <- c("split_cds_phastcons", "split_cds_regulatory")
 mutation_maps <- c("roulette")

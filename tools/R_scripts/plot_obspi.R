@@ -568,148 +568,6 @@ human_maps_10kb <- fread("maps/maps_10kb.csv.gz")
 human_maps_100kb <- fread("maps/maps_100kb.csv.gz") 
 human_maps_1Mb <- fread("maps/maps_1Mb.csv.gz") 
 
-## 10 kb
-gw_fitmeasures_10kb_samechrom <- data.frame()
-gw_fitmeasures_10kb_freechrom <- data.frame()
-for(dag in 2:4) {
-  for(m in constrained_models) { 
-    tmp <- fread(paste("sem/lavaan_out/obspi_YRI_DAG",
-                       dag, "_fitmeasures_10kb_genomewide", 
-                       "_latents_", m, "_freechrom.csv", sep=""))
-    
-    tmp$DAG <- dag
-    tmp$constrained_model <- m
-    tmp$method <- "freechrom"
-    
-    tmp <- dplyr::select(tmp, c(pvalue, cfi, gfi, rmsea, method, DAG, constrained_model))
-    gw_fitmeasures_10kb_freechrom <- rbind.data.frame(gw_fitmeasures_10kb_freechrom, tmp)
-    
-    tmp <- fread(paste("sem/lavaan_out/obspi_YRI_DAG",
-                       dag, "_fitmeasures_10kb_genomewide", 
-                       "_latents_", m, ".csv", sep=""))
-    
-    tmp$DAG <- dag
-    tmp$constrained_model <- m
-    tmp$method <- "samechrom"
-    
-    tmp <- dplyr::select(tmp, c(pvalue, cfi, gfi, rmsea, method, DAG, constrained_model))
-    gw_fitmeasures_10kb_samechrom <- rbind.data.frame(gw_fitmeasures_10kb_samechrom, tmp)
-  }
-}
-gw_fitmeasures_10kb_samechrom$scale <- 1e+4
-gw_fitmeasures_10kb_freechrom$scale <- 1e+4
-
-## 100 kb
-gw_fitmeasures_100kb_samechrom <- data.frame()
-gw_fitmeasures_100kb_freechrom <- data.frame()
-for(dag in 2:4) {
-  for(m in constrained_models) { 
-    tmp <- fread(paste("sem/lavaan_out/obspi_YRI_DAG",
-                       dag, "_fitmeasures_100kb_genomewide", 
-                       "_latents_", m, "_freechrom.csv", sep=""))
-    
-    tmp$DAG <- dag
-    tmp$constrained_model <- m
-    tmp$method <- "freechrom"
-    
-    tmp <- dplyr::select(tmp, c(pvalue, cfi, gfi, rmsea, method, DAG, constrained_model))
-    gw_fitmeasures_100kb_freechrom <- rbind.data.frame(gw_fitmeasures_100kb_freechrom, tmp)
-    
-    tmp <- fread(paste("sem/lavaan_out/obspi_YRI_DAG",
-                       dag, "_fitmeasures_100kb_genomewide", 
-                       "_latents_", m, ".csv", sep=""))
-    
-    tmp$DAG <- dag
-    tmp$constrained_model <- m
-    tmp$method <- "samechrom"
-    
-    tmp <- dplyr::select(tmp, c(pvalue, cfi, gfi, rmsea, method, DAG, constrained_model))
-    gw_fitmeasures_100kb_samechrom <- rbind.data.frame(gw_fitmeasures_100kb_samechrom, tmp)
-  }
-}
-gw_fitmeasures_100kb_samechrom$scale <- 1e+5
-gw_fitmeasures_100kb_freechrom$scale <- 1e+5
-
-## 1 Mb
-gw_fitmeasures_1Mb_samechrom <- data.frame()
-gw_fitmeasures_1Mb_freechrom <- data.frame()
-for(dag in 2:4) {
-  for(m in constrained_models) { 
-    tmp <- fread(paste("sem/lavaan_out/obspi_YRI_DAG",
-                       dag, "_fitmeasures_1Mb_genomewide", 
-                       "_latents_", m, "_freechrom.csv", sep=""))
-    
-    tmp$DAG <- dag
-    tmp$constrained_model <- m
-    tmp$method <- "freechrom"
-    
-    tmp <- dplyr::select(tmp, c(pvalue, cfi, gfi, rmsea, method, DAG, constrained_model))
-    gw_fitmeasures_1Mb_freechrom <- rbind.data.frame(gw_fitmeasures_1Mb_freechrom, tmp)
-    
-    tmp <- fread(paste("sem/lavaan_out/obspi_YRI_DAG",
-                       dag, "_fitmeasures_1Mb_genomewide", 
-                       "_latents_", m, ".csv", sep=""))
-    
-    tmp$DAG <- dag
-    tmp$constrained_model <- m
-    tmp$method <- "samechrom"
-    
-    tmp <- dplyr::select(tmp, c(pvalue, cfi, gfi, rmsea, method, DAG, constrained_model))
-    gw_fitmeasures_1Mb_samechrom <- rbind.data.frame(gw_fitmeasures_1Mb_samechrom, tmp)
-  }
-}
-gw_fitmeasures_1Mb_samechrom$scale <- 1e+6
-gw_fitmeasures_1Mb_freechrom$scale <- 1e+6
-
-gw_fitmeasures_samechrom <- rbind.data.frame(gw_fitmeasures_10kb_samechrom,
-                                             gw_fitmeasures_100kb_samechrom,
-                                             gw_fitmeasures_1Mb_samechrom) %>%
-  dplyr::select(c(pvalue, cfi, gfi, rmsea, method, DAG, constrained_model, scale))
-
-gw_fitmeasures_freechrom <- rbind.data.frame(gw_fitmeasures_10kb_freechrom,
-                                             gw_fitmeasures_100kb_freechrom,
-                                             gw_fitmeasures_1Mb_freechrom) %>%
-  dplyr::select(c(pvalue, cfi, gfi, rmsea, method, DAG, constrained_model, scale))
-
-gw_fitmeasures_latent <- rbind.data.frame(gw_fitmeasures_freechrom, gw_fitmeasures_samechrom)
-
-# DAG 2 is just-identified 
-p <- ggplot(data=filter(gw_fitmeasures_latent, DAG!=2), 
-            aes(x=scale/1e3, y=-log10(pvalue), color=as.factor(DAG))) +
-  geom_point(size=3, shape=2) + geom_hline(yintercept=-log10(0.05), linetype="dashed", color="darkgrey") +
-  facet_wrap(~constrained_model, labeller=labeller(constrained_model=model_labels)) + # NOTE check labeller
-  scale_x_log10(breaks=c(10, 100, 1000)) +
-  scale_color_manual(values=c("purple3", "brown1", "cyan3"), name="DAG") +
-  labs(title=NULL, x="Scale (kb)", y=expression(-log[10](italic(p)))) + theme_classic() +
-  theme(strip.text.y=element_text(size=16),       
-        strip.text.x=element_text(size=16),      
-        axis.title=element_text(size=16), 
-        axis.text=element_text(size=12), 
-        axis.text.x=element_text(size=12),
-        legend.text=element_text(size=16),
-        legend.title=element_text(size=16),
-        legend.position="bottom")
-save_plot("sem/gw_pvals_latent_freechrom_vs_same.pdf", p, base_height=6, base_width=12)
-
-q <- ggplot(data=filter(gw_fitmeasures_latent, DAG!=2),  
-            aes(x=scale, y=cfi, color=method)) +
-  geom_point(size=3) +
-  geom_hline(yintercept=0.9, linetype="dashed", color="darkgrey") +
-  facet_grid(DAG~constrained_model, labeller=labeller(constrained_model=model_labels)) + theme_classic() + 
-  scale_y_continuous(breaks=pretty_breaks()) +
-  scale_x_log10(breaks=c(1e+4, 1e+5, 1e+6)) +
-  scale_color_manual(values=c("cyan3", "brown1")) +
-  labs(title="CFI for genome-wide models, latent variables", x="Scale", y="CFI") +
-  theme(strip.text.y=element_text(size=16),  
-        strip.text.x=element_text(size=16),  
-        axis.title=element_text(size=16), 
-        axis.text=element_text(size=12), 
-        axis.text.x=element_text(size=12),
-        legend.text=element_text(size=16),
-        legend.title=element_text(size=16),
-        legend.position="bottom")
-save_plot("sem/gw_cfi_latent_freechrom_vs_same.pdf", q, base_height=10, base_width=20)
-
 # per chromosome SEM models
 ## 10 kb
 chr_fitmeasures_10kb <- data.frame()
@@ -1232,6 +1090,9 @@ chr_r2_1Mb$scale <- 1e+6
 
 # NOTE: there are no fit measures available for DAGs 1-2
 chr_r2_DAGs12 <- rbind.data.frame(chr_r2_10kb, chr_r2_100kb, chr_r2_1Mb)
+chr_r2_DAGs12$constrained_model <- factor(chr_r2_DAGs12$constrained_model, 
+                                          levels = names(elem_labels), 
+                                          labels = unname(elem_labels)) 
 
 p <- ggplot(data=chr_r2_DAGs12, aes(x=chrom, y=avg_pi * 100, color=as.factor(DAG))) +
   geom_point(size=3) + theme_classic() + 
@@ -1487,10 +1348,6 @@ q <- ggplot(data=chr_r2_ext_DAGs34, aes(x=chrom, y=avg_mut * 100, color=as.facto
 save_plot("sem/chr_r2_mut_DAGs3-4_latents.pdf", q, base_height=6, base_width=12)
 
 chr_r2_dags <- rbind.data.frame(chr_r2_DAGs12, dplyr::select(chr_r2_DAGs34, -avg_mut))
-
-chr_r2_dags$constrained_model <- factor(chr_r2_dags$constrained_model, 
-                                        levels = names(elem_labels), 
-                                        labels = unname(elem_labels)) 
 
 # summaries
 #chr_r2_dags[, `:=`(min_r2=min(avg_pi), max_r2=max(avg_pi)), by=.(DAG, constrained_model, scale)]
@@ -2168,13 +2025,14 @@ save_plot("sem/chr_cov_mut_E.pdf", t1, base_height=7, base_width=15)
 #################
 
 summary(chr_fitmeasures_latent)
-summars <- fread("~/Data/bgs_lmr/human_data/data/h38.genome")
+summars <- fread("~/Devel/bgs_lmr/data/h38.genome")
+
 names(summars)[1] <- "chrom"
 
-# reloading
-human_maps_10kb <- fread("maps/maps_10kb.csv.gz") %>% filter(., constrained_model %in% constrained_models) %>% setDT()
-human_maps_100kb <- fread("maps/maps_100kb.csv.gz") %>% filter(., constrained_model %in% constrained_models) %>% setDT()
-human_maps_1Mb <- fread("maps/maps_1Mb.csv.gz") %>% filter(., constrained_model %in% constrained_models) %>% setDT()
+# reloading, picking mut map arbitrarily, will be replaced by latent
+human_maps_10kb <- fread("maps/maps_10kb.csv.gz") %>% filter(., constrained_model %in% constrained_models, mut_map=="roulette") %>% setDT()
+human_maps_100kb <- fread("maps/maps_100kb.csv.gz") %>% filter(., constrained_model %in% constrained_models, mut_map=="roulette") %>% setDT()
+human_maps_1Mb <- fread("maps/maps_1Mb.csv.gz") %>% filter(., constrained_model %in% constrained_models, mut_map=="roulette") %>% setDT()
 
 # mutation latent
 mut_latent_10kb <- fread("maps/mut_latent_10kb.csv.gz")
@@ -2199,11 +2057,10 @@ for(m in constrained_models) {
 
 # merging per chr summaries
 ## 10 kb 
-tbl_10kb <- left_join(filter(human_maps_10kb, mut_map=="roulette"),
-                      mut_latent_10kb, by=c("chrom", "chromStart", "chromEnd"))
+tbl_10kb <- left_join(dplyr::filter(human_maps_10kb), mut_latent_10kb, by=c("chrom", "chromStart", "chromEnd")) %>% setDT()
 tbl_10kb[, rec_latent_log := log1p(avg_rec)] # no latent for rec, use log of raw pyrho instead
 
-tbl_10kb <- filter(tbl_10kb, coverage >= 0.75) %>%
+tbl_10kb <- dplyr::filter(tbl_10kb, coverage >= 0.75) %>%
   dplyr::select(., c(chrom,
                      constrained_model,
                      prop_del_sites,
@@ -2220,7 +2077,7 @@ tbl_10kb$constrained_model <- factor(tbl_10kb$constrained_model,
                                 labels = unname(elem_labels)) 
 
 ## 100 kb 
-tbl_100kb <- left_join(human_maps_100kb, mut_latent_100kb, by=c("chrom", "chromStart", "chromEnd"))
+tbl_100kb <- left_join(human_maps_100kb, mut_latent_100kb, by=c("chrom", "chromStart", "chromEnd")) %>% setDT()
 tbl_100kb[, rec_latent_log := log1p(avg_rec)] # no latent for rec, use log of raw pyrho instead
 
 tbl_100kb <- filter(tbl_100kb, coverage >= 0.5) %>%
@@ -2240,7 +2097,7 @@ tbl_100kb$constrained_model <- factor(tbl_100kb$constrained_model,
                                      labels = unname(elem_labels)) 
 
 ## 1 Mb 
-tbl_1Mb <- left_join(human_maps_1Mb, mut_latent_1Mb, by=c("chrom", "chromStart", "chromEnd"))
+tbl_1Mb <- left_join(human_maps_1Mb, mut_latent_1Mb, by=c("chrom", "chromStart", "chromEnd")) %>% setDT()
 tbl_1Mb[, rec_latent_log := log1p(avg_rec)] # no latent for rec, use log of raw pyrho instead
 
 tbl_1Mb <- filter(tbl_1Mb, coverage >= 0.25) %>%
@@ -2259,7 +2116,7 @@ tbl_1Mb$constrained_model <- factor(tbl_1Mb$constrained_model,
                                       levels = names(elem_labels), 
                                       labels = unname(elem_labels)) 
 
-tbl_summaries <- rbind.data.frame(tbl_10kb, tbl_100kb, tbl_1Mb)
+tbl_summaries <- rbind.data.frame(tbl_10kb, tbl_100kb, tbl_1Mb) %>% setDT()
 df <- left_join(tbl_summaries, chr_fitmeasures_latent, by=c("scale", "chrom", "constrained_model"))
 
 # diagnostics
@@ -2331,7 +2188,7 @@ s <- ggplot(data=df, aes(x=prop_del_sites_log * 100, y=cfi, color=as.factor(DAG)
         legend.position="bottom")
 save_plot("sem/chr_CFI_delsites.pdf", s, base_height=8, base_width=14)
 
-setDT(chr_r2_dags)
+chr_r2_new <- dplyr::filter(chr_r2_dags, DAG==3 | DAG==4) %>% setDT()
 tab <- left_join(tbl_summaries, chr_r2_dags, by=c("scale", "chrom", "constrained_model"))
 
 lm_list <- list(length=length(constrained_models) * length(unique(tab$scale)) * length(unique(tab$DAG)))
@@ -2416,7 +2273,7 @@ o <- ggplot(data=filter(r2_df, DAG==3 | DAG==4, r2=="R-sqrd.adjusted"),
         legend.text=element_text(size=16),
         legend.title=element_text(size=16),
         legend.position="bottom")
-save_plot("sem/r2r2_pi.pdf", o, base_height=5, base_width=8)
+save_plot("sem/r2r2_pi.pdf", o, base_height=4.5, base_width=12)
 
 p <- ggplot(data=filter(tab, DAG==3 | DAG==4), 
             aes(x=GC, y=avg_pi, color=as.factor(DAG))) +

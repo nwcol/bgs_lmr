@@ -1,7 +1,7 @@
 # Background selection with local mutation rate variation in humans
 
 This repository contains analyses and data for our paper on background
-selection (BGS) and mutation rate variation, preprinted here: XXX
+selection (BGS) with mutation rate variation, preprinted [here](https://www.biorxiv.org/content/10.64898/2026.06.02.727906v2.abstract)
 
 ## Contents
 
@@ -14,10 +14,10 @@ for further details.
 [local\_models/](local_models) contains scripts used to compute expected BGS at
 a fine genomic resolution (1kb).
 
-[models/](models) contains final predictions at 10kb coarseness. These are
+[models/](models) contains final predictions at the 10kb scale. These are
 scaled-up versions of the models in [local\_models/].
 Fine-scale `B`-maps for a subset of models can be found in 
-[models/maps\_1kb/](models/maps_1kb).
+[models/B\_maps\_1kb/](models/B\_maps_1kb).
 This directory also contains some tables summarizing predictions and 
 goodness-of-fit.
 

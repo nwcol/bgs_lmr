@@ -121,7 +121,7 @@ for(m in constrained_models) {
   tbl_10kb <- filter(human_maps_10kb, constrained_model==m, coverage >= 0.75)
   table_10kb_g <- tbl_10kb[,1:3]
   table_10kb_g[, avg_pi := log(tbl_10kb$avg_pi)]
-  table_10kb_g[, avg_rec := log(tbl_10kb$avg_rec)] # pyrho YRI pop.
+  table_10kb_g[, avg_rec := log1p(tbl_10kb$avg_rec)] # rec map used in prediction
   table_10kb_g[, prop_del_sites := log1p(tbl_10kb$prop_del_sites)]
 
   #table_10kb_g <- left_join(table_10kb_g, rec_latent_10kb, by=c("chrom", "chromStart", "chromEnd")) 
@@ -208,7 +208,7 @@ for(m in constrained_models) {
                missing = "fiml",
                meanstructure = FALSE,
                std.ov = TRUE,
-               fixed.x = TRUE,
+               fixed.x = FALSE,
                optim.method = "nlminb",
                group="chrom",
                group.equal="regressions",
@@ -267,7 +267,7 @@ for(m in constrained_models) {
                 missing = "fiml",
                 meanstructure = FALSE,
                 std.ov = TRUE,
-                fixed.x = TRUE,
+                fixed.x = FALSE,
                 optim.method = "nlminb",
                 group="chrom",
                 group.equal="none",
@@ -378,7 +378,7 @@ for(m in constrained_models) {
                data = sem_df_std,
                estimator = "MLR",
                missing = "fiml",
-               fixed.x = TRUE,
+               fixed.x = FALSE,
                meanstructure = FALSE,
                std.ov = TRUE,
                optim.method = "nlminb",
@@ -436,7 +436,7 @@ for(m in constrained_models) {
                 missing = "fiml",
                 meanstructure = FALSE,
                 std.ov = TRUE,
-                fixed.x = TRUE,
+                fixed.x = FALSE,
                 optim.method = "nlminb",
                 group="chrom",
                 group.equal="none",
@@ -555,7 +555,7 @@ for(m in constrained_models) {
                missing = "fiml",
                meanstructure = FALSE,
                std.ov = TRUE,
-               fixed.x = TRUE,
+               fixed.x = FALSE,
                optim.method = "nlminb",
                group="chrom",
                group.equal="regressions",
@@ -614,7 +614,7 @@ for(m in constrained_models) {
                 missing = "fiml",
                 meanstructure = FALSE,
                 std.ov = TRUE,
-                fixed.x = TRUE,
+                fixed.x = FALSE,
                 optim.method = "nlminb",
                 group="chrom",
                 group.equal="none",
@@ -737,7 +737,7 @@ for(m in constrained_models) {
                missing = "fiml",
                meanstructure = FALSE,
                std.ov = TRUE,
-               fixed.x = TRUE,
+               fixed.x = FALSE,
                optim.method = "nlminb",
                group="chrom",
                group.equal="regressions",
@@ -793,7 +793,7 @@ for(m in constrained_models) {
                 missing = "fiml",
                 meanstructure = FALSE,
                 std.ov = TRUE,
-                fixed.x = TRUE,
+                fixed.x = FALSE,
                 optim.method = "nlminb",
                 group="chrom",
                 group.equal="none",
@@ -907,7 +907,7 @@ for(m in constrained_models) {
                   missing = "fiml",
                   meanstructure = FALSE,
                   std.ov = TRUE,
-                  fixed.x = TRUE,
+                  fixed.x = FALSE,
                   optim.method = "nlminb",
                   control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
 
@@ -931,7 +931,7 @@ for(m in constrained_models) {
                   missing = "fiml",
                   meanstructure = FALSE,
                   std.ov = TRUE,
-                  fixed.x = TRUE,
+                  fixed.x = FALSE,
                   optim.method = "nlminb",
                   control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
 
@@ -955,7 +955,7 @@ for(m in constrained_models) {
                   missing = "fiml",
                   meanstructure = FALSE,
                   std.ov = TRUE,
-                  fixed.x = TRUE,
+                  fixed.x = FALSE,
                   optim.method = "nlminb",
                   control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
 
@@ -985,7 +985,7 @@ for(m in constrained_models) {
                   missing = "fiml",
                   meanstructure = FALSE,
                   std.ov = TRUE,
-                  fixed.x = TRUE,
+                  fixed.x = FALSE,
                   optim.method = "nlminb",
                   control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
 
@@ -1040,7 +1040,7 @@ if(bootstrap) { # bootstrapping windows
                      missing = "fiml",
                      meanstructure = FALSE,
                      std.ov = TRUE,
-                     fixed.x = TRUE,
+                     fixed.x = FALSE,
                      optim.method = "nlminb",
                      control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
   
@@ -1052,7 +1052,7 @@ if(bootstrap) { # bootstrapping windows
                      missing = "fiml",
                      meanstructure = FALSE,
                      std.ov = TRUE,
-                     fixed.x = TRUE,
+                     fixed.x = FALSE,
                      optim.method = "nlminb",
                      control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
   
@@ -1064,7 +1064,7 @@ if(bootstrap) { # bootstrapping windows
                      missing = "fiml",
                      meanstructure = FALSE,
                      std.ov = TRUE,
-                     fixed.x = TRUE,
+                     fixed.x = FALSE,
                      optim.method = "nlminb",
                      control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
   
@@ -1076,7 +1076,7 @@ if(bootstrap) { # bootstrapping windows
                      missing = "fiml",
                      meanstructure = FALSE,
                      std.ov = TRUE,
-                     fixed.x = TRUE,
+                     fixed.x = FALSE,
                      optim.method = "nlminb",
                      control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
   
@@ -1136,7 +1136,7 @@ if(permut) { # permuting chr labels
                      missing = "fiml",
                      meanstructure = FALSE,
                      std.ov = TRUE,
-                     fixed.x = TRUE,
+                     fixed.x = FALSE,
                      optim.method = "nlminb",
                      control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
   
@@ -1146,7 +1146,7 @@ if(permut) { # permuting chr labels
                      missing = "fiml",
                      meanstructure = FALSE,
                      std.ov = TRUE,
-                     fixed.x = TRUE,
+                     fixed.x = FALSE,
                      optim.method = "nlminb",
                      control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
   
@@ -1156,7 +1156,7 @@ if(permut) { # permuting chr labels
                      missing = "fiml",
                      meanstructure = FALSE,
                      std.ov = TRUE,
-                     fixed.x = TRUE,
+                     fixed.x = FALSE,
                      optim.method = "nlminb",
                      control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
   
@@ -1166,7 +1166,7 @@ if(permut) { # permuting chr labels
                      missing = "fiml",
                      meanstructure = FALSE,
                      std.ov = TRUE,
-                     fixed.x = TRUE,
+                     fixed.x = FALSE,
                      optim.method = "nlminb",
                      control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
   
@@ -1205,7 +1205,7 @@ for(m in constrained_models) {
   tbl_100kb <- filter(human_maps_100kb, constrained_model==m, coverage >= 0.5)  
   table_100kb_g <- tbl_100kb[,1:3]
   table_100kb_g[, avg_pi := log(tbl_100kb$avg_pi)]
-  table_100kb_g[, avg_rec := log(tbl_100kb$avg_rec)] # pyrho YRI pop.
+  table_100kb_g[, avg_rec := log1p(tbl_100kb$avg_rec)] # rec map used in prediction
   table_100kb_g[, prop_del_sites := log1p(tbl_100kb$prop_del_sites)]
   
   #table_100kb_g <- left_join(table_100kb_g, rec_latent_100kb, by=c("chrom", "chromStart", "chromEnd"))
@@ -1280,7 +1280,7 @@ for(m in constrained_models) {
                missing = "fiml",             
                meanstructure = FALSE,            
                std.ov = TRUE,
-               fixed.x = TRUE,
+               fixed.x = FALSE,
                optim.method = "nlminb",
                group="chrom",
                group.equal="regressions",
@@ -1326,7 +1326,7 @@ for(m in constrained_models) {
                 missing = "fiml",             
                 meanstructure = FALSE,            
                 std.ov = TRUE,  
-                fixed.x = TRUE,
+                fixed.x = FALSE,
                 optim.method = "nlminb",         
                 group="chrom",
                 group.equal="none",
@@ -1428,7 +1428,7 @@ for(m in constrained_models) {
                data = dt,         
                estimator = "MLR",              
                missing = "fiml",
-               fixed.x = TRUE,
+               fixed.x = FALSE,
                meanstructure = FALSE,            
                std.ov = TRUE,               
                optim.method = "nlminb",         
@@ -1476,7 +1476,7 @@ for(m in constrained_models) {
                 missing = "fiml",             
                 meanstructure = FALSE,            
                 std.ov = TRUE,    
-                fixed.x = TRUE,
+                fixed.x = FALSE,
                 optim.method = "nlminb",         
                 group="chrom",
                 group.equal="none",
@@ -1589,7 +1589,7 @@ for(m in constrained_models) {
                missing = "fiml",             
                meanstructure = FALSE,            
                std.ov = TRUE,
-               fixed.x = TRUE,
+               fixed.x = FALSE,
                optim.method = "nlminb",         
                group="chrom",
                group.equal="regressions",
@@ -1637,7 +1637,7 @@ for(m in constrained_models) {
                 missing = "fiml",             
                 meanstructure = FALSE,            
                 std.ov = TRUE,    
-                fixed.x = TRUE,
+                fixed.x = FALSE,
                 optim.method = "nlminb",         
                 group="chrom",
                 group.equal="none",
@@ -1750,7 +1750,7 @@ for(m in constrained_models) {
                missing = "fiml",             
                meanstructure = FALSE,            
                std.ov = TRUE,
-               fixed.x = TRUE,
+               fixed.x = FALSE,
                optim.method = "nlminb",         
                group="chrom",
                group.equal="regressions",
@@ -1796,7 +1796,7 @@ for(m in constrained_models) {
                 missing = "fiml",             
                 meanstructure = FALSE,            
                 std.ov = TRUE,    
-                fixed.x = TRUE,
+                fixed.x = FALSE,
                 optim.method = "nlminb",         
                 group="chrom",
                 group.equal="none",
@@ -1908,7 +1908,7 @@ for(m in constrained_models) {
                   missing = "fiml",             
                   meanstructure = FALSE,            
                   std.ov = TRUE,     
-                  fixed.x = TRUE,
+                  fixed.x = FALSE,
                   optim.method = "nlminb",    
                   control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
     
@@ -1932,7 +1932,7 @@ for(m in constrained_models) {
                   missing = "fiml",             
                   meanstructure = FALSE,            
                   std.ov = TRUE,     
-                  fixed.x = TRUE,
+                  fixed.x = FALSE,
                   optim.method = "nlminb",    
                   control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
     
@@ -1956,7 +1956,7 @@ for(m in constrained_models) {
                   missing = "fiml",             
                   meanstructure = FALSE,            
                   std.ov = TRUE,     
-                  fixed.x = TRUE,
+                  fixed.x = FALSE,
                   optim.method = "nlminb",    
                   control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
     
@@ -1986,7 +1986,7 @@ for(m in constrained_models) {
                   missing = "fiml",             
                   meanstructure = FALSE,            
                   std.ov = TRUE,     
-                  fixed.x = TRUE,
+                  fixed.x = FALSE,
                   optim.method = "nlminb",    
                   control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
     
@@ -2041,7 +2041,7 @@ if(bootstrap) { # bootstrapping windows
                     missing = "fiml",
                     meanstructure = FALSE,
                     std.ov = TRUE,
-                    fixed.x = TRUE,
+                    fixed.x = FALSE,
                     optim.method = "nlminb",
                     control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
       
@@ -2053,7 +2053,7 @@ if(bootstrap) { # bootstrapping windows
                     missing = "fiml",
                     meanstructure = FALSE,
                     std.ov = TRUE,
-                    fixed.x = TRUE,
+                    fixed.x = FALSE,
                     optim.method = "nlminb",
                     control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
       
@@ -2065,7 +2065,7 @@ if(bootstrap) { # bootstrapping windows
                     missing = "fiml",
                     meanstructure = FALSE,
                     std.ov = TRUE,
-                    fixed.x = TRUE,
+                    fixed.x = FALSE,
                     optim.method = "nlminb",
                     control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
       
@@ -2077,7 +2077,7 @@ if(bootstrap) { # bootstrapping windows
                     missing = "fiml",
                     meanstructure = FALSE,
                     std.ov = TRUE,
-                    fixed.x = TRUE,
+                    fixed.x = FALSE,
                     optim.method = "nlminb",
                     control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
       
@@ -2139,7 +2139,7 @@ if(permut) { # permuting chr labels
                     missing = "fiml",
                     meanstructure = FALSE,
                     std.ov = TRUE,
-                    fixed.x = TRUE,
+                    fixed.x = FALSE,
                     optim.method = "nlminb",
                     control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
       
@@ -2149,7 +2149,7 @@ if(permut) { # permuting chr labels
                     missing = "fiml",
                     meanstructure = FALSE,
                     std.ov = TRUE,
-                    fixed.x = TRUE,
+                    fixed.x = FALSE,
                     optim.method = "nlminb",
                     control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
       
@@ -2159,7 +2159,7 @@ if(permut) { # permuting chr labels
                     missing = "fiml",
                     meanstructure = FALSE,
                     std.ov = TRUE,
-                    fixed.x = TRUE,
+                    fixed.x = FALSE,
                     optim.method = "nlminb",
                     control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
       
@@ -2169,7 +2169,7 @@ if(permut) { # permuting chr labels
                     missing = "fiml",
                     meanstructure = FALSE,
                     std.ov = TRUE,
-                    fixed.x = TRUE,
+                    fixed.x = FALSE,
                     optim.method = "nlminb",
                     control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
       
@@ -2208,7 +2208,7 @@ for(m in constrained_models) {
   tbl_1Mb <- filter(human_maps_1Mb, constrained_model==m, coverage >= 0.2)  
   table_1Mb_g <- tbl_1Mb[,1:3]
   table_1Mb_g[, avg_pi := log(tbl_1Mb$avg_pi)]
-  table_1Mb_g[, avg_rec := log(tbl_1Mb$avg_rec)] # pyrho YRI pop.
+  table_1Mb_g[, avg_rec := log1p(tbl_1Mb$avg_rec)] # rec map used in prediction
   table_1Mb_g[, prop_del_sites := log1p(tbl_1Mb$prop_del_sites)]
   
   #table_1Mb_g <- left_join(table_1Mb_g, rec_latent_1Mb, by=c("chrom", "chromStart", "chromEnd"))
@@ -2283,7 +2283,7 @@ for(m in constrained_models) {
                missing = "fiml",             
                meanstructure = FALSE,            
                std.ov = TRUE,
-               fixed.x = TRUE,
+               fixed.x = FALSE,
                optim.method = "nlminb",
                group="chrom",
                group.equal="regressions",
@@ -2329,7 +2329,7 @@ for(m in constrained_models) {
                 missing = "fiml",             
                 meanstructure = FALSE,            
                 std.ov = TRUE,  
-                fixed.x = TRUE,
+                fixed.x = FALSE,
                 optim.method = "nlminb",         
                 group="chrom",
                 group.equal="none",
@@ -2431,7 +2431,7 @@ for(m in constrained_models) {
                data = dt,         
                estimator = "MLR",              
                missing = "fiml",
-               fixed.x = TRUE,
+               fixed.x = FALSE,
                meanstructure = FALSE,            
                std.ov = TRUE,               
                optim.method = "nlminb",         
@@ -2479,7 +2479,7 @@ for(m in constrained_models) {
                 missing = "fiml",             
                 meanstructure = FALSE,            
                 std.ov = TRUE,    
-                fixed.x = TRUE,
+                fixed.x = FALSE,
                 optim.method = "nlminb",         
                 group="chrom",
                 group.equal="none",
@@ -2592,7 +2592,7 @@ for(m in constrained_models) {
                missing = "fiml",             
                meanstructure = FALSE,            
                std.ov = TRUE,
-               fixed.x = TRUE,
+               fixed.x = FALSE,
                optim.method = "nlminb",         
                group="chrom",
                group.equal="regressions",
@@ -2640,7 +2640,7 @@ for(m in constrained_models) {
                 missing = "fiml",             
                 meanstructure = FALSE,            
                 std.ov = TRUE,    
-                fixed.x = TRUE,
+                fixed.x = FALSE,
                 optim.method = "nlminb",         
                 group="chrom",
                 group.equal="none",
@@ -2753,7 +2753,7 @@ for(m in constrained_models) {
                missing = "fiml",             
                meanstructure = FALSE,            
                std.ov = TRUE,
-               fixed.x = TRUE,
+               fixed.x = FALSE,
                optim.method = "nlminb",         
                group="chrom",
                group.equal="regressions",
@@ -2799,7 +2799,7 @@ for(m in constrained_models) {
                 missing = "fiml",             
                 meanstructure = FALSE,            
                 std.ov = TRUE,    
-                fixed.x = TRUE,
+                fixed.x = FALSE,
                 optim.method = "nlminb",         
                 group="chrom",
                 group.equal="none",
@@ -2911,7 +2911,7 @@ for(m in constrained_models) {
                   missing = "fiml",             
                   meanstructure = FALSE,            
                   std.ov = TRUE,     
-                  fixed.x = TRUE,
+                  fixed.x = FALSE,
                   optim.method = "nlminb",    
                   control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
     
@@ -2935,7 +2935,7 @@ for(m in constrained_models) {
                   missing = "fiml",             
                   meanstructure = FALSE,            
                   std.ov = TRUE,     
-                  fixed.x = TRUE,
+                  fixed.x = FALSE,
                   optim.method = "nlminb",    
                   control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
     
@@ -2959,7 +2959,7 @@ for(m in constrained_models) {
                   missing = "fiml",             
                   meanstructure = FALSE,            
                   std.ov = TRUE,     
-                  fixed.x = TRUE,
+                  fixed.x = FALSE,
                   optim.method = "nlminb",    
                   control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
     
@@ -2989,7 +2989,7 @@ for(m in constrained_models) {
                   missing = "fiml",             
                   meanstructure = FALSE,            
                   std.ov = TRUE,     
-                  fixed.x = TRUE,
+                  fixed.x = FALSE,
                   optim.method = "nlminb",    
                   control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
     
@@ -3044,7 +3044,7 @@ if(bootstrap) { # bootstrapping windows
                     missing = "fiml",
                     meanstructure = FALSE,
                     std.ov = TRUE,
-                    fixed.x = TRUE,
+                    fixed.x = FALSE,
                     optim.method = "nlminb",
                     control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
       
@@ -3056,7 +3056,7 @@ if(bootstrap) { # bootstrapping windows
                     missing = "fiml",
                     meanstructure = FALSE,
                     std.ov = TRUE,
-                    fixed.x = TRUE,
+                    fixed.x = FALSE,
                     optim.method = "nlminb",
                     control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
       
@@ -3068,7 +3068,7 @@ if(bootstrap) { # bootstrapping windows
                     missing = "fiml",
                     meanstructure = FALSE,
                     std.ov = TRUE,
-                    fixed.x = TRUE,
+                    fixed.x = FALSE,
                     optim.method = "nlminb",
                     control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
       
@@ -3080,7 +3080,7 @@ if(bootstrap) { # bootstrapping windows
                     missing = "fiml",
                     meanstructure = FALSE,
                     std.ov = TRUE,
-                    fixed.x = TRUE,
+                    fixed.x = FALSE,
                     optim.method = "nlminb",
                     control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
       
@@ -3142,7 +3142,7 @@ if(permut) { # permuting chr labels
                     missing = "fiml",
                     meanstructure = FALSE,
                     std.ov = TRUE,
-                    fixed.x = TRUE,
+                    fixed.x = FALSE,
                     optim.method = "nlminb",
                     control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
       
@@ -3152,7 +3152,7 @@ if(permut) { # permuting chr labels
                     missing = "fiml",
                     meanstructure = FALSE,
                     std.ov = TRUE,
-                    fixed.x = TRUE,
+                    fixed.x = FALSE,
                     optim.method = "nlminb",
                     control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
       
@@ -3162,7 +3162,7 @@ if(permut) { # permuting chr labels
                     missing = "fiml",
                     meanstructure = FALSE,
                     std.ov = TRUE,
-                    fixed.x = TRUE,
+                    fixed.x = FALSE,
                     optim.method = "nlminb",
                     control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
       
@@ -3172,7 +3172,7 @@ if(permut) { # permuting chr labels
                     missing = "fiml",
                     meanstructure = FALSE,
                     std.ov = TRUE,
-                    fixed.x = TRUE,
+                    fixed.x = FALSE,
                     optim.method = "nlminb",
                     control = list(trace = 0, rel.tol = 1e-8, iter.max = 1000))
       

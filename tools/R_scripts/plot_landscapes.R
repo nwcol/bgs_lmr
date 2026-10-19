@@ -6,7 +6,7 @@
 #
 #################
 
-source("~/Data/bgs_lmr/human_data/tools/HelperFunctions.R")
+source("~/Devel/bgs_lmr/tools/R_scripts/HelperFunctions.R")
 
 constrained_models <- c("split_cds_phastcons", "split_cds_regulatory")
 mutation_maps <- c("carlson", "gnomad", "roulette")
@@ -156,6 +156,9 @@ pi_100kb <- ggplot(dat_100kb, aes(x = chromStart / 1e6)) +
   geom_point(data = dat_100kb,
              aes(y = avg_pi, group = paste0("r", run_id)), size = 1.5) +
   theme_classic() +
+  annotate("text", label = "Chromosome 22", size = 5,
+           x = mean(range(dat_100kb$chromStart / 1e6)),
+           y = 0.95 * max(range(c(dat_100kb$avg_pi, dat_100kb$exp_pi)))) +
   scale_x_continuous(breaks = pretty_breaks()) +
   scale_y_continuous(breaks = pretty_breaks()) +
   labs(title = NULL, x = "Position (Mb)", y = expression(pi)) +
@@ -163,7 +166,7 @@ pi_100kb <- ggplot(dat_100kb, aes(x = chromStart / 1e6)) +
         axis.text.x = element_text(size = 14),
         axis.text.y = element_text(size = 14),
         axis.title.y = element_text(size = 22))
-save_plot("plots/c22pi100k.pdf", pi_100kb, base_width=15, base_height=5)
+save_plot("plots/c22pi100k.pdf", pi_100kb, base_width=15, base_height=6)
 
 # plots landscapes (main figure)
 c <- 8
@@ -276,7 +279,7 @@ p_100kb <- ggplot(dat_100kb, aes(x = chromStart / 1e6)) + theme_classic() +
   scale_color_manual(values = c("obs_pi" = "black",
                                 "CDS + Regulatory" = "brown1",
                                 "CDS + phastCons" = "cyan4"), name=NULL,
-                     labels=c("Observed", "Expected (CDS + Regulatory)", "Expected (CDS + phastCons)")) +
+                     labels=c("Expected (CDS + phastCons)",  "Expected (CDS + Regulatory)", "Observed")) +
   labs(title = NULL, x = "Position (Mb)", y = expression(pi)) +
   theme(strip.text.y = element_blank(),
         strip.text.x = element_blank(),

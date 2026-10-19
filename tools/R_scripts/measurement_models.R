@@ -332,7 +332,8 @@ rec_maps_1Mb <- rec_maps_1kb %>%
                      mean_deCODE))
 
 ################# testing measurement model on chr1, 1 Mb scale ################# 
-if(interactive()) {
+test_chr1 <- FALSE
+if(test_chr1) {
   # ismc chr 1, from the book chapter Barroso & Dutheil 2026
   ismc_chr1 <- fread("/media/gvbarroso/extradrive1/iSMC/iSMC_Mbuti/Mbuti_chr1.rho.1Mb.bedgraph")
   names(ismc_chr1)[4:9] <- c(paste("ismc", 1:4, sep="_"), "ismc_mean", "ismc_joint")

@@ -1,0 +1,40 @@
+# Add a neutral diversity column to 10kb landscape tables stored in
+# tables_10kb_no_neu_pi/.
+
+
+DEMOGS = [
+    "equilibrium_granular_Ne",
+    "equilibrium_single_Ne",
+]
+
+MODELS = [
+    "merged_cds_regulatory",
+    "merged_cds_phastcons",
+    "split_cds_regulatory",
+    "split_cds_phastcons",
+]
+
+UMAPS = [
+    "roulette",
+    "gnomad",
+    "carlson",
+]
+
+CHROMS = list(range(1, 23))
+
+rule all:
+    input:
+        expand("tables_10kb/{demog}/{model}/{umap}/B_tbl_YRI_chr{chrom}_10kb.csv.gz",
+               demog=DEMOGS, model=MODELS, umap=UMAPS, chrom=CHROMS)
+
+
+rule add_neutral_exp_pi_column:
+    input:
+        script = "../tools/py_scripts/compute_neu_pi.py",
+        table = "tables_10kb_no_neu_pi/{demog}/{model}/{umap}/B_tbl_YRI_chr{chrom}_10kb.csv.gz"
+    output:
+        table = "tables_10kb/{demog}/{model}/{umap}/B_tbl_YRI_chr{chrom}_10kb.csv.gz"
+    shell:
+        """
+        python {input.script} -i {input.table} -o {output}
+        """

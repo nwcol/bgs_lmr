@@ -1,26 +1,31 @@
 # Add a neutral diversity column to 10kb landscape tables stored in
 # tables_10kb_no_neu_pi/.
 
+import numpy as np
+import pandas
+
 
 DEMOGS = [
     "equilibrium_granular_Ne",
     "equilibrium_single_Ne",
 ]
-
 MODELS = [
     "merged_cds_regulatory",
     "merged_cds_phastcons",
     "split_cds_regulatory",
     "split_cds_phastcons",
 ]
-
 UMAPS = [
     "roulette",
     "gnomad",
     "carlson",
 ]
-
 CHROMS = list(range(1, 23))
+
+# Auxiliary constants
+PHAST_BINS = [f"{int(i*5)}-{int((i+1)*5)}" for i in range(12)]
+CDS_BINS = list(range(1, 12))
+
 
 rule all:
     input:
@@ -28,12 +33,120 @@ rule all:
                demog=DEMOGS, model=MODELS, umap=UMAPS, chrom=CHROMS)
 
 
+rule compute_neutral_obs_pi_merged_cds_regulatory:
+    input:
+        script = "../tools/py_scripts/build_neu_pi_table.py",
+        ndns = "../data/ndns_arrays/ndns_YRI_chr{chrom}.npy",
+        mask = "../data/masks/strict_{umap}/mask_chr{chrom}.bed.gz",
+        elements = [
+            "../data/annotations/cds/merged/cds_merged_chr{chrom}.bed.gz",
+            "../data/annotations/regulatory/promoters/promoters_chr{chrom}.bed.gz",
+            "../data/annotations/regulatory/enhancers/enhancers_chr{chrom}.bed.gz",
+        ],
+    output:
+        "../data/neu_pi_tables/merged_cds_regulatory/{umap}/pi_tbl_YRI_chr{chrom}.csv.gz"
+    shell:
+        """
+        python {input.script} \
+            -i {input.ndns} \
+            --mask {input.mask} \
+            --elements {input.elements} \
+            --scale 10000 \
+            -o {output}
+        """
+
+
+rule compute_neutral_obs_pi_merged_cds_phastcons:
+    input:
+        script = "../tools/py_scripts/build_neu_pi_table.py",
+        ndns = "../data/ndns_arrays/ndns_YRI_chr{chrom}.npy",
+        mask = "../data/masks/strict_{umap}/mask_chr{chrom}.bed.gz",
+        elements = [
+            "../data/annotations/cds/merged/cds_merged_chr{chrom}.bed.gz",
+        ] + expand("../data/annotations/phastcons/top{b}/phastcons_top{b}_chr{{chrom}}.bed.gz", b=PHAST_BINS)
+    output:
+        "../data/neu_pi_tables/merged_cds_phastcons/{umap}/pi_tbl_YRI_chr{chrom}.csv.gz"
+    shell:
+        """
+        python {input.script} \
+            -i {input.ndns} \
+            --mask {input.mask} \
+            --elements {input.elements} \
+            --scale 10000 \
+            -o {output}
+        """
+
+
+rule compute_neutral_obs_pi_split_cds_regulatory:
+    input:
+        script = "../tools/py_scripts/build_neu_pi_table.py",
+        ndns = "../data/ndns_arrays/ndns_YRI_chr{chrom}.npy",
+        mask = "../data/masks/strict_{umap}/mask_chr{chrom}.bed.gz",
+        elements = expand("../data/annotations/cds/lof_d{d}/cds_lof_d{d}_chr{{chrom}}.bed.gz", d=CDS_BINS) \
+            + ["../data/annotations/regulatory/promoters/promoters_chr{chrom}.bed.gz",
+               "../data/annotations/regulatory/enhancers/enhancers_chr{chrom}.bed.gz"],
+    output:
+        "../data/neu_pi_tables/split_cds_regulatory/{umap}/pi_tbl_YRI_chr{chrom}.csv.gz"
+    shell:
+        """
+        python {input.script} \
+            -i {input.ndns} \
+            --mask {input.mask} \
+            --elements {input.elements} \
+            --scale 10000 \
+            -o {output}
+        """
+
+
+rule compute_neutral_obs_pi_split_cds_phastcons:
+    input:
+        script = "../tools/py_scripts/build_neu_pi_table.py",
+        ndns = "../data/ndns_arrays/ndns_YRI_chr{chrom}.npy",
+        mask = "../data/masks/strict_{umap}/mask_chr{chrom}.bed.gz",
+        elements = expand("../data/annotations/cds/lof_d{d}/cds_lof_d{d}_chr{{chrom}}.bed.gz", d=CDS_BINS) \
+            + expand("../data/annotations/phastcons/top{b}/phastcons_top{b}_chr{{chrom}}.bed.gz", b=PHAST_BINS)
+    output:
+        "../data/neu_pi_tables/split_cds_phastcons/{umap}/pi_tbl_YRI_chr{chrom}.csv.gz"
+    shell:
+        """
+        python {input.script} \
+            -i {input.ndns} \
+            --mask {input.mask} \
+            --elements {input.elements} \
+            --scale 10000 \
+            -o {output}
+        """
+
+
+rule add_neutral_obs_pi:
+    input:
+        B_tbl = "tables_10kb_no_neu_pi/{demog}/{model}/{umap}/B_tbl_YRI_chr{chrom}_10kb.csv.gz",
+        pi_tbl = "../data/neu_pi_tables/{model}/{umap}/pi_tbl_YRI_chr{chrom}.csv.gz"
+    output:
+        tbl = "tables_10kb/{demog}/{model}/{umap}/B_tbl_YRI_chr{chrom}_10kb.csv.gz"
+    run:
+        B_df = pandas.read_csv(input.B_tbl)
+        pi_df = pandas.read_csv(input.pi_tbl)
+        midpoints_B = np.mean([B_df["chromStart"], B_df["chromEnd"]], axis=0)
+        midpoints_pi = np.mean([pi_df["chromStart"], pi_df["chromEnd"]], axis=0)
+        include = np.array([x in midpoints_B for x in midpoints_pi]).astype(bool)
+        # Check
+        n_tot = np.array(B_df["num_sites"])
+        n_del = np.array(B_df["del_sites"])
+        n_neu = np.array(pi_df["neu_sites"])[include]
+        assert np.all(n_neu == n_tot - n_del)
+        B_df["neu_pi"] = np.array(pi_df["neu_pi"])[include]
+        B_df.to_csv(output.tbl, index=False)
+
+
+# Add a neutral E[pi] column to each table (this is trivial to compute using
+# information in the table)
 rule add_neutral_exp_pi_column:
     input:
         script = "../tools/py_scripts/compute_neu_pi.py",
         table = "tables_10kb_no_neu_pi/{demog}/{model}/{umap}/B_tbl_YRI_chr{chrom}_10kb.csv.gz"
     output:
-        table = "tables_10kb/{demog}/{model}/{umap}/B_tbl_YRI_chr{chrom}_10kb.csv.gz"
+        table = "dep_tables_10kb/{demog}/{model}/{umap}/B_tbl_YRI_chr{chrom}_10kb.csv.gz"
     shell:
         """
         python {input.script} -i {input.table} -o {output}

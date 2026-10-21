@@ -64,7 +64,7 @@ p <- ggplot(data=human_summaries, aes(y=cv_mut, x=ac_mut)) + theme_bw() +
         legend.text=element_text(size=16),
         legend.title=element_text(size=16),
         legend.position="bottom")
-save_plot("2D_plot_mut.pdf", p, base_height=6, base_width=12)
+save_plot("2D_plot_mut.pdf", p, base_height=9, base_width=12)
 
 ################### recombination
 # decode map
@@ -101,7 +101,7 @@ pyrho_summaries[, rec_map := "pyrho"]
 rec_summaries <- rbind.data.frame(decode_summaries, pyrho_summaries)
 
 # Plotting 2D recombination maps (AC x CV)
-p <- ggplot(data=rec_summaries, aes(y=cv_rec, x=ac_rec)) + theme_bw() +
+q <- ggplot(data=rec_summaries, aes(y=cv_rec, x=ac_rec)) + theme_bw() +
   facet_grid(rec_map~scale/1e3, scale="free") +
   ggrepel::geom_text_repel(aes(label=chrom), vjust=0.3, size=3, max.overlaps=Inf) +
   # https://stats.stackexchange.com/questions/185425/how-to-determine-the-critical-values-of-acf
@@ -118,4 +118,4 @@ p <- ggplot(data=rec_summaries, aes(y=cv_rec, x=ac_rec)) + theme_bw() +
         legend.text=element_text(size=16),
         legend.title=element_text(size=16),
         legend.position="bottom")
-save_plot("2D_plot_rec.pdf", p, base_height=6, base_width=12)
+save_plot("2D_plot_rec.pdf", q, base_height=6, base_width=12)

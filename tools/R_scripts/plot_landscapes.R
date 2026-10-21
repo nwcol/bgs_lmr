@@ -13,118 +13,6 @@ mutation_maps <- c("carlson", "gnomad", "roulette")
 
 #################
 # 
-# Genomewide correlations, part I
-#
-#################
-
-maps_1Mb <- fread("maps/maps_1Mb.csv.gz")
-maps_100kb <- fread("maps/maps_100kb.csv.gz")
-maps_10kb <- fread("maps/maps_10kb.csv.gz") 
-
-cor_list <- vector("list", length=3*3*2)
-x <- 1
-for(u in mutation_maps) {
-  for(m in constrained_models) {
-
-    gw_maps_1Mb <- maps_1Mb %>% filter(mut_map==u, constrained_model==m, coverage >= 0.25)
-    piexp <- cor.test(gw_maps_1Mb$avg_pi, gw_maps_1Mb$exp_pi)$estimate
-    B <- cor.test(gw_maps_1Mb$avg_pi, gw_maps_1Mb$B)$estimate
-    mut <- cor.test(gw_maps_1Mb$avg_pi, gw_maps_1Mb$avg_mut)$estimate
-    rec <- cor.test(gw_maps_1Mb$avg_pi, gw_maps_1Mb$avg_rec)$estimate
-    Elem <- cor.test(gw_maps_1Mb$avg_pi, gw_maps_1Mb$del_sites)$estimate
-    
-    cor_list[[x]] <- cbind.data.frame(piexp, B, mut, rec, Elem, m, u)
-    x <- x + 1
-  }
-}
-
-cor_dt_1Mb <- data.table::rbindlist(cor_list)
-names(cor_dt_1Mb) <- c("pi_exp", "B", "mut_rate", "rec_rate", "E", "elements", "mutation_map")
-cor_dt_1Mb$scale <- 1e+6
-
-cor_list <- vector("list", length=3*3*2)
-x <- 1
-for(u in mutation_maps) {
-  for(m in constrained_models) {
-
-    gw_maps_100kb <- maps_100kb %>% filter(mut_map==u, constrained_model==m, coverage >= 0.5)
-    piexp <- cor.test(gw_maps_100kb$avg_pi, gw_maps_100kb$exp_pi)$estimate
-    B <- cor.test(gw_maps_100kb$avg_pi, gw_maps_100kb$B)$estimate
-    mut <- cor.test(gw_maps_100kb$avg_pi, gw_maps_100kb$avg_mut)$estimate
-    rec <- cor.test(gw_maps_100kb$avg_pi, gw_maps_100kb$avg_rec)$estimate
-    Elem <- cor.test(gw_maps_100kb$avg_pi, gw_maps_100kb$del_sites)$estimate
-    
-    cor_list[[x]] <- cbind.data.frame(piexp, B, mut, rec, Elem, m, u)
-    x <- x + 1
-  }
-}
-
-cor_dt_100kb <- data.table::rbindlist(cor_list)
-names(cor_dt_100kb) <- c("pi_exp", "B", "mut_rate", "rec_rate", "E", "elements", "mutation_map")
-cor_dt_100kb$scale <- 1e+5
-
-cor_list <- vector("list", length=3*3*2)
-x <- 1
-for(u in mutation_maps) {
-  for(m in constrained_models) {
-
-    gw_maps_10kb <- maps_10kb %>% filter(mut_map==u, constrained_model==m, coverage >= 0.75)
-    piexp <- cor.test(gw_maps_10kb$avg_pi, gw_maps_10kb$exp_pi)$estimate
-    B <- cor.test(gw_maps_10kb$avg_pi, gw_maps_10kb$B)$estimate
-    mut <- cor.test(gw_maps_10kb$avg_pi, gw_maps_10kb$avg_mut)$estimate
-    rec <- cor.test(gw_maps_10kb$avg_pi, gw_maps_10kb$avg_rec)$estimate
-    Elem <- cor.test(gw_maps_10kb$avg_pi, gw_maps_10kb$del_sites)$estimate
-    
-    cor_list[[x]] <- cbind.data.frame(piexp, B, mut, rec, Elem, m, u)
-    x <- x + 1
-  }
-}
-
-cor_dt_10kb <- data.table::rbindlist(cor_list)
-names(cor_dt_10kb) <- c("pi_exp", "B", "mut_rate", "rec_rate", "E", "elements", "mutation_map")
-cor_dt_10kb$scale <- 1e+4
-
-cor_dt <- data.table(rbind.data.frame(cor_dt_10kb, cor_dt_100kb, cor_dt_1Mb))
-m_cor_dt <- pivot_longer(cor_dt, cols=c("pi_exp", "B", "mut_rate", "rec_rate", "E"),
-                         names_to="predictor", values_to="correlation")
-
-m_cor_dt$elements <- factor(m_cor_dt$elements, 
-                            levels = names(elem_labels), 
-                            labels = unname(elem_labels)) 
-
-m_cor_dt$mutation_map <- factor(m_cor_dt$mutation_map, 
-                                levels = names(mut_labels), 
-                                labels = unname(mut_labels))
-
-p <- ggplot(m_cor_dt, aes(x=scale/1e3, y=correlation^2, color=predictor)) +
-  facet_grid(mutation_map~elements) + theme_classic() +
-  geom_line(data = m_cor_dt, linewidth = 0.75) +
-  geom_point(size = 3) +
-  scale_color_manual(name = NULL, 
-                     values = c( B = "brown1", 
-                                 E = "green4",
-                                 mut_rate = "gold3",
-                                 pi_exp = "purple3",
-                                 rec_rate = "grey2"), 
-                     labels = c( B = "B",
-                                 E = "E", 
-                                 mut_rate = expression(mu), 
-                                 pi_exp = expression(pi[exp]),
-                                 rec_rate = "r")) +
-  scale_x_log10(breaks = c(10, 100, 1000)) +
-  scale_y_continuous(breaks = pretty_breaks()) +
-  ylab(expression(R^2)) + xlab("Scale (kb)") +
-  theme(strip.text.x = element_text(size = 16),
-        strip.text.y = element_text(size = 16),
-        axis.title.x = element_text(size = 16),
-        axis.text.x = element_text(size = 14),
-        axis.text.y = element_text(size = 14),
-        axis.title.y = element_text(size = 16),
-        legend.position = "bottom")
-save_plot("sem/R2_pi_gw.pdf", p, base_height=8, base_width=15)
-
-#################
-# 
 # Landscapes (main figures)
 #
 #################
@@ -639,23 +527,32 @@ save_plot("sem/detailed_r2.pdf", cp, base_height=7, base_width=10)
 #
 #################
 
-file_list <- list.files("../../data/pi_tables/roulette/")
-pis_1kb <- data.table::rbindlist(lapply(paste0("../../data/pi_tables/roulette/", file_list), fread))
+file_list <- list.files("data/pi_tables/roulette/")
+pis_1kb <- data.table::rbindlist(lapply(paste0("data/pi_tables/roulette/", file_list), fread))
 pis_1kb[, mut_map :="roulette"]
 pis_1kb[, pos := chromStart + 500]
 
-file_list <- list.files("split_cds_phastcons/roulette/maps_1kb/")
-bs_1kb_phast <- data.table::rbindlist(lapply(paste0("split_cds_phastcons/roulette/maps_1kb/", file_list), fread))
+file_list <- list.files("models/B_maps_1kb/equilibrium_granular_Ne/split_cds_phastcons/roulette/", full.names=T)
+bs_1kb_phast <- data.table::rbindlist(lapply(file_list, fread))
 bs_1kb_phast[, mut_map :="roulette"]
 bs_1kb_phast[, element := "CDS + phastCons"]
 
-file_list <- list.files("split_cds_regulatory/roulette/maps_1kb/")
-bs_1kb_reg <- data.table::rbindlist(lapply(paste0("split_cds_regulatory/roulette/maps_1kb/", file_list), fread))
+file_list <- list.files("models/B_maps_1kb/equilibrium_granular_Ne/split_cds_regulatory/roulette/", , full.names=T)
+bs_1kb_reg <- data.table::rbindlist(lapply(file_list, fread))
 bs_1kb_reg[, mut_map :="roulette"]
 bs_1kb_reg[, element := "CDS + regulatory"]
 
+# pause to find intersection
+inter <- merge(bs_1kb_reg, bs_1kb_phast, by=c("chrom", "pos"))
+inter <- merge(inter, pis_1kb, by=c("chrom", "pos"))
+inter[B.x > 0.9 & B.y > 0.9,]
+setnames(inter, old=c("B.x", "B.y"), new=c("B_reg", "B_phast"))
+inter <- dplyr::select(inter, c(chrom, pos, B_reg, B_phast, num_sites))
+fwrite(inter, "B_intersection.csv.gz")
+
 tbl_1kb_reg <- merge(pis_1kb, bs_1kb_reg) %>% filter(., num_sites >= 500) %>% setDT()
 tbl_1kb_phast <- merge(pis_1kb, bs_1kb_phast) %>% filter(., num_sites >= 500) %>% setDT()
+
 
 # assigning to 1-percentile bins of B
 tbl_1kb_reg[, B_bin := cut(B, breaks = quantile(B, probs = seq(0, 1, 0.01), na.rm = TRUE), include.lowest = TRUE, labels = FALSE)]
@@ -809,7 +706,7 @@ x3 <- ggplot(tab_1Mb_m, aes(y = avg_pi, x = Rate, color=Map)) +
         legend.key.size=unit(12, "pt"),
         legend.title=element_text(size=16, face="bold"))
 xp <- plot_grid(x1, x2, x3, nrow=1, align="h", labels=c("A", "B", "C"))
-save_plot("plots/genome_wide_cors_2.pdf", xp, base_height=7, base_width=24)
+save_plot("plots/genome_wide_cors.pdf", xp, base_height=7, base_width=24)
 
 # output by fit_obspi.R
 r2_sem <- fread("sem/obspi_chr_r2pi.csv") %>% filter(., DAG==4) %>% 

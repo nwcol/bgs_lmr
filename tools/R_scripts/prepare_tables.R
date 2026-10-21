@@ -4,7 +4,7 @@
 # This script loads the tables generated with moments++ and bgshr
 # for different models (constrained elements, mutation maps)
 # and prepares them for downstream SEM analyses and visualization
-# NOTE: this script should be run from within each current_models dir
+# NOTE: this script should be run from within each models dir
 #
 #################
 

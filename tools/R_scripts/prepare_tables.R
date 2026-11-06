@@ -4,7 +4,7 @@
 # This script loads the tables generated with moments++ and bgshr
 # for different models (constrained elements, mutation maps)
 # and prepares them for downstream SEM analyses and visualization
-# NOTE: this script should be run from within each models dir
+# NOTE: this script should be run from within each tables_10kb dir
 #
 #################
 
@@ -76,8 +76,8 @@ human_maps_100kb <- human_maps_10kb %>%
     B = weighted.mean(B, weight, na.rm = TRUE),
     exp_pi = weighted.mean(exp_pi, weight, na.rm = TRUE),
     avg_pi = weighted.mean(avg_pi, weight, na.rm = TRUE),
+    neu_pi = weighted.mean(neu_pi, weight, na.rm = TRUE),
     pi_sim_tot = weighted.mean(pi_sim_tot, weight, na.rm = TRUE),
-    prop_del_sites = weighted.mean(prop_del_sites, weight, na.rm = TRUE),
     .groups = "drop") %>% setDT()
 
 human_maps_100kb[, scale := 1e5]
@@ -88,7 +88,7 @@ human_maps_100kb[, prop_del_sites := del_sites / num_sites]
 human_maps_100kb[, bin_100kb := NULL]
 
 setcolorder(human_maps_100kb, c("chrom", "chromStart", "chromEnd", "constrained_model", "mut_map", "scale", "coverage", "num_sites", "del_sites",
-                                "prop_del_sites", "avg_mut", "avg_rec", "B", "exp_pi", "avg_pi", "pi_sim_tot"))
+                                "prop_del_sites", "avg_mut", "avg_rec", "B", "exp_pi", "avg_pi", "neu_pi", "pi_sim_tot"))
 fwrite(human_maps_100kb, "maps/maps_100kb.csv.gz")
 
 # 1 Mb binning
@@ -102,8 +102,8 @@ human_maps_1Mb <- human_maps_10kb %>%
     B = weighted.mean(B, weight, na.rm = TRUE),
     exp_pi = weighted.mean(exp_pi, weight, na.rm = TRUE),
     avg_pi = weighted.mean(avg_pi, weight, na.rm = TRUE),
+    neu_pi = weighted.mean(neu_pi, weight, na.rm = TRUE),
     pi_sim_tot = weighted.mean(pi_sim_tot, weight, na.rm = TRUE),
-    prop_del_sites = weighted.mean(prop_del_sites, weight, na.rm = TRUE),
     .groups = "drop") %>% setDT()
 
 human_maps_1Mb[, scale := 1e6]
@@ -114,7 +114,7 @@ human_maps_1Mb[, prop_del_sites := del_sites / num_sites]
 human_maps_1Mb[, bin_1Mb := NULL]
 
 setcolorder(human_maps_1Mb, c("chrom", "chromStart", "chromEnd", "constrained_model", "mut_map", "scale", "coverage", "num_sites", "del_sites",
-                              "prop_del_sites", "avg_mut", "avg_rec", "B", "exp_pi", "avg_pi", "pi_sim_tot"))
+                              "prop_del_sites", "avg_mut", "avg_rec", "B", "exp_pi", "avg_pi", "neu_pi", "pi_sim_tot"))
 fwrite(human_maps_1Mb, "maps/maps_1Mb.csv.gz")
 
 human_maps_10kb[, bin_100kb := NULL]
@@ -122,5 +122,5 @@ human_maps_10kb[, bin_1Mb := NULL]
 setnames(human_maps_10kb, old="weight", new="num_sites")
 
 setcolorder(human_maps_10kb, c("chrom", "chromStart", "chromEnd", "constrained_model", "mut_map", "scale", "coverage", "num_sites", "del_sites",
-                               "prop_del_sites", "avg_mut", "avg_rec", "B", "exp_pi", "avg_pi", "pi_sim_tot"))
+                               "prop_del_sites", "avg_mut", "avg_rec", "B", "exp_pi", "avg_pi", "neu_pi", "pi_sim_tot"))
 fwrite(human_maps_10kb, "maps/maps_10kb.csv.gz")

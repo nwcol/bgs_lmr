@@ -17,6 +17,7 @@ library(RColorBrewer)
 library(rtracklayer) # genonomic lift-over
 library(patchwork)
 
+library(bootstrap)
 library(stats)
 library(MASS)
 library(lmtest)
@@ -83,17 +84,13 @@ num_chrom <- 22
 
 
 # ---------- lavaan model selection  ----------
-safeLRT <- function(fitA, fitB, robust_method = "satorra.bentler.2010", verbose = FALSE) {
+safeLRT <- function(fitA, fitB, robust_method = "satorra.bentler.2010") {
   dfA <- fitMeasures(fitA, "df")
   dfB <- fitMeasures(fitB, "df")
   chisqA <- fitMeasures(fitA, "chisq")
   chisqB <- fitMeasures(fitB, "chisq")
   chisqA_scaled <- fitMeasures(fitA, "chisq.scaled")
   chisqB_scaled <- fitMeasures(fitB, "chisq.scaled")
-  
-  if(any(is.na(c(dfA, dfB, chisqA, chisqB)))) {
-    stop("One or both models lack standard df or chisq. Check fitMeasures(fit, c('df','chisq')).")
-  }
   
   if(dfA > dfB) {
     fit_small <- fitA; fit_large <- fitB
@@ -107,7 +104,6 @@ safeLRT <- function(fitA, fitB, robust_method = "satorra.bentler.2010", verbose 
   scaled_small <- fitMeasures(fit_small, "chisq.scaled")
   scaled_large <- fitMeasures(fit_large, "chisq.scaled")
   if(!is.na(scaled_small) && !is.na(scaled_large)) {
-    if (verbose) message("Using robust LRT (", robust_method, ").")
     return(lavTestLRT(fit_small, fit_large, method = robust_method))
   }
   
@@ -118,7 +114,7 @@ safeLRT <- function(fitA, fitB, robust_method = "satorra.bentler.2010", verbose 
   df_large <- fitMeasures(fit_large, "df")
   
   chi_diff <- chisq_small - chisq_large
-  df_diff  <- df_small - df_large
+  df_diff <- df_small - df_large
   
   if(is.na(chi_diff) || is.na(df_diff)) {
     stop("Cannot compute fallback LRT: chi-square or df is NA for one of the models.")
@@ -130,7 +126,6 @@ safeLRT <- function(fitA, fitB, robust_method = "satorra.bentler.2010", verbose 
   p_value <- pchisq(chi_diff, df_diff, lower.tail = FALSE)
   out <- data.table(chisq_diff = chi_diff, df_diff = df_diff, `Pr(>Chisq)` = p_value)
   rownames(out) <- "chisq"
-  if(verbose) message("Using standard (unscaled) LRT fallback.")
   return(out)
 }
 
@@ -139,20 +134,9 @@ add_genome_offsets_and_midpoint <- function(tbl,
                                             chrom_lengths = NULL,
                                             chrom_col = "chrom",
                                             start_col = "chromStart",
-                                            end_col = "chromEnd",
-                                            out_midpoint_name = "midpoint",
-                                            order_chrom_by = c("natural", "provided", "lexicographic"),
-                                            keep_integer_midpoint = FALSE) {
-  
-  if (!requireNamespace("data.table", quietly = TRUE)) stop("data.table required")
-  order_chrom_by <- match.arg(order_chrom_by)
+                                            end_col = "chromEnd") {
   
   dt <- data.table::as.data.table(tbl)
-  
-  # validate input columns
-  if (!all(c(chrom_col, start_col, end_col) %in% names(dt))) {
-    stop("tbl must contain columns: ", paste(c(chrom_col, start_col, end_col), collapse = ", "))
-  }
   
   # normalize types
   dt[[chrom_col]] <- as.character(dt[[chrom_col]])
@@ -178,29 +162,11 @@ add_genome_offsets_and_midpoint <- function(tbl,
     chrom_lengths[, length := as.numeric(length)]
   }
   
-  # determine chromosome order
   chroms <- unique(chrom_lengths$chrom)
-  if (order_chrom_by == "provided") {
-    chrom_lengths <- chrom_lengths[match(chroms, chrom_lengths$chrom)]
-  } else if (order_chrom_by == "natural") {
-    extract_num <- function(x) {
-      x2 <- sub("^chr", "", x, ignore.case = TRUE)
-      suppressWarnings(as.integer(sub("^.*?_?([0-9]+)$", "\\1", x2)))
-    }
-    nums <- extract_num(chroms)
-    has_num <- !is.na(nums)
-    # numeric chromosomes first sorted, then the remainder lexicographically
-    ord <- c(order(nums[has_num], na.last = NA), order(chroms[!has_num]))
-    chrom_ordered <- chroms[ord]
-    chrom_lengths <- chrom_lengths[match(chrom_ordered, chrom_lengths$chrom)]
-  } else {
-    chrom_lengths <- chrom_lengths[order(chrom)]
-  }
-  
-  # compute cumulative offsets such that the first chromosome has offset 0
+  chrom_lengths <- chrom_lengths[order(chrom)]
   chrom_lengths[, chrom_offset := as.numeric(data.table::shift(cumsum(length), fill = 0))]
   
-  # join offsets into dt
+  # join
   setkeyv(chrom_lengths, "chrom")
   dt_temp <- copy(dt)
   data.table::setnames(dt_temp, old = chrom_col, new = "chrom", skip_absent = TRUE)
@@ -209,17 +175,10 @@ add_genome_offsets_and_midpoint <- function(tbl,
   # compute genome-wide coordinates; first chromosome receives offset 0 by design
   dt_temp[, gstart := chrom_offset + get(start_col)]
   dt_temp[, gend   := chrom_offset + get(end_col)]
-  dt_temp[, (out_midpoint_name) := (gstart + gend) / 2]
-  
-  if (isTRUE(keep_integer_midpoint)) {
-    dt_temp[, (out_midpoint_name) := floor(get(out_midpoint_name))]
-  }
-  
-  # restore original chrom column name if different
-  if (chrom_col != "chrom") data.table::setnames(dt_temp, "chrom", chrom_col)
+  dt_temp[, midpoint := (gstart + gend) / 2]
   
   # assemble output columns (preserve original columns order then append new columns)
-  new_cols <- c("chrom_offset", "gstart", "gend", out_midpoint_name)
+  new_cols <- c("chrom_offset", "gstart", "gend", "midpoint")
   # avoid duplicating columns if input already had same names
   new_cols <- new_cols[!new_cols %in% names(tbl)]
   out_cols <- c(names(tbl), new_cols)
@@ -238,10 +197,10 @@ make_lavaan_model <- function(edges,
   free_by <- match.arg(free_by)
   stopifnot(is.list(edges) && length(edges) > 0)
   
-  # helper to normalize an RHS spec into a list(predictor, label, start)
+  # helper to normalize an RHS into a list
   normalize_rhs <- function(r) {
-    if (is.character(r) && length(r) == 1) return(list(p = r, label = NULL, start = NULL))
-    if (is.list(r) && !is.null(r$p)) {
+    if(is.character(r) && length(r) == 1) return(list(p = r, label = NULL, start = NULL))
+    if(is.list(r) && !is.null(r$p)) {
       return(list(p = as.character(r$p),
                   label = if (!is.null(r$label)) as.character(r$label) else NULL,
                   start = if (!is.null(r$start)) as.numeric(r$start) else NULL))
@@ -249,14 +208,13 @@ make_lavaan_model <- function(edges,
     stop("RHS must be a string or list with element 'p'")
   }
   
-  # collect labeled edges in deterministic order (for mapping if needed)
   collect_labels <- function(edges_list) {
     labs <- character(0)
-    for (lhs in names(edges_list)) {
+    for(lhs in names(edges_list)) {
       rhss <- edges_list[[lhs]]
-      for (r in rhss) {
+      for(r in rhss) {
         nr <- normalize_rhs(r)
-        if (!is.null(nr$label)) labs <- c(labs, nr$label)
+        if(!is.null(nr$label)) labs <- c(labs, nr$label)
       }
     }
     unique(labs)
@@ -266,16 +224,16 @@ make_lavaan_model <- function(edges,
   
   lines <- character(0)
   edge_i <- 0L
-  for (lhs in names(edges)) {
+  for(lhs in names(edges)) {
     rhss <- edges[[lhs]]
-    for (r in rhss) {
+    for(r in rhss) {
       edge_i <- edge_i + 1L
       nr <- normalize_rhs(r)
       p <- nr$p; lab <- nr$label; st <- nr$start
       
       start_part <- if (!is.null(st)) paste0("start(", st, ")*") else ""
       
-      if (free_by == "shared") {
+      if(free_by == "shared") {
         # label or unlabeled (shared across groups)
         if (!is.null(lab)) lab_part <- paste0(lab, "*") else lab_part <- ""
         line <- paste0(lhs, " ~ ", start_part, lab_part, p)
@@ -283,7 +241,6 @@ make_lavaan_model <- function(edges,
         
       } else if (free_by == "groups") {
         if (is.null(groups) || groups < 1) {
-          # we still allow groups to be NULL; labels remain per-edge
           lab_name <- paste0(label_prefix, edge_i)
         } else {
           lab_name <- paste0(label_prefix, edge_i)
@@ -293,10 +250,9 @@ make_lavaan_model <- function(edges,
         lines <- c(lines, line)
         
       } else { # free_by == "named"
-        # per_group_map allows specifying which particular edges should be group-specific
         key <- paste0(lhs, "~", p)
-        if (!is.null(per_group_map) && !is.na(per_group_map[key]) && per_group_map[key] == "groups") {
-          if (is.null(groups) || groups < 1) stop("groups must be provided for per-group labels")
+        if(!is.null(per_group_map) && !is.na(per_group_map[key]) && per_group_map[key] == "groups") {
+          if(is.null(groups) || groups < 1) stop("groups must be provided for per-group labels")
           lab_names <- paste0(label_prefix, edge_i, "_g", seq_len(groups))
           lab_vec <- paste0("c(", paste(lab_names, collapse = ", "), ")*")
           line <- paste0(lhs, " ~ ", start_part, lab_vec, p)
@@ -313,11 +269,11 @@ make_lavaan_model <- function(edges,
   }
   
   # covariances
-  if (!is.null(covs) && length(covs) > 0) {
-    for (cv in covs) {
-      if (is.character(cv) && length(cv) == 2) {
+  if(!is.null(covs) && length(covs) > 0) {
+    for(cv in covs) {
+      if(is.character(cv) && length(cv) == 2) {
         lines <- c(lines, paste0(cv[1], " ~~ ", cv[2]))
-      } else if (is.list(cv) && length(cv) == 2) {
+      } else if(is.list(cv) && length(cv) == 2) {
         lines <- c(lines, paste0(cv[[1]], " ~~ ", cv[[2]]))
       } else {
         stop("covs must be pairs of variable names")
@@ -331,7 +287,7 @@ make_lavaan_model <- function(edges,
     for (nm in names(defined)) {
       expr <- defined[[nm]]
       # if original labels (like c1,c2,...) exist and we've generated per-edge labels,
-      # remap occurrences of original labels to the new per-edge label names where possible.
+      # remap occurrences of original labels to the new per-edge label names where possible
       for (orig_lab in original_labels) {
         idx <- label_to_index[[orig_lab]]
         if (!is.null(idx) && !is.na(idx)) {
@@ -361,8 +317,8 @@ make_lavaan_model_free_with_grouped_defined <- function(edges,
   stopifnot(!missing(groups) && is.numeric(groups) && groups >= 1)
   
   normalize_rhs <- function(r) {
-    if (is.character(r) && length(r) == 1) return(list(p = r, label = NULL, start = NULL))
-    if (is.list(r) && !is.null(r$p)) {
+    if(is.character(r) && length(r) == 1) return(list(p = r, label = NULL, start = NULL))
+    if(is.list(r) && !is.null(r$p)) {
       return(list(p = as.character(r$p),
                   label = if (!is.null(r$label)) as.character(r$label) else NULL,
                   start = if (!is.null(r$start)) as.numeric(r$start) else NULL))
@@ -370,11 +326,10 @@ make_lavaan_model_free_with_grouped_defined <- function(edges,
     stop("RHS must be a string or list with element 'p'")
   }
   
-  # collect original labeled tokens in deterministic order
   orig_labels <- character(0)
-  for (lhs in names(edges)) for (r in edges[[lhs]]) {
+  for(lhs in names(edges)) for (r in edges[[lhs]]) {
     nr <- normalize_rhs(r)
-    if (!is.null(nr$label)) orig_labels <- c(orig_labels, nr$label)
+    if(!is.null(nr$label)) orig_labels <- c(orig_labels, nr$label)
   }
   orig_labels <- unique(orig_labels)
   label_index <- setNames(seq_along(orig_labels), orig_labels)
@@ -416,19 +371,15 @@ make_lavaan_model_free_with_grouped_defined <- function(edges,
     }
   }
   
-  # expand defined expressions into per-group scalar definitions
   if (!is.null(defined) && length(defined) > 0) {
-    # helper: build per-group vector tokens for an original label if it was emitted as group-specific
     build_vec_tokens <- function(orig_lab, edge_index) {
       paste0(label_prefix, edge_index, defined_suffix_sep, seq_len(groups))
     }
-    
-    # we need to know which edge index corresponds to each original label
-    # walk edges in same order to map label -> edge_index (first occurrence)
+
     label_to_edge_index <- list()
     edge_i2 <- 0L
-    for (lhs in names(edges)) {
-      for (r in edges[[lhs]]) {
+    for(lhs in names(edges)) {
+      for(r in edges[[lhs]]) {
         edge_i2 <- edge_i2 + 1L
         nr <- normalize_rhs(r)
         if (!is.null(nr$label) && !(nr$label %in% names(label_to_edge_index))) {
@@ -437,19 +388,16 @@ make_lavaan_model_free_with_grouped_defined <- function(edges,
       }
     }
     
-    for (nm in names(defined)) {
+    for(nm in names(defined)) {
       expr <- defined[[nm]]
-      # find occurrences of original labels and replace with per-group token names
-      # but we produce explicit scalar defined lines per group
       for (g in seq_len(groups)) {
         expr_g <- expr
         for (orig in orig_labels) {
-          if (orig %in% names(label_to_edge_index)) {
+          if(orig %in% names(label_to_edge_index)) {
             ei <- label_to_edge_index[[orig]]
             token_g <- paste0(label_prefix, ei, defined_suffix_sep, g)
             expr_g <- gsub(paste0("\\b", orig, "\\b"), token_g, expr_g, perl = TRUE)
           } else {
-            # if original label not found, leave token unchanged (rare)
             expr_g <- gsub(paste0("\\b", orig, "\\b"), orig, expr_g, perl = TRUE)
           }
         }
@@ -461,6 +409,7 @@ make_lavaan_model_free_with_grouped_defined <- function(edges,
   
   paste(lines, collapse = paste0("\n", sep))
 }
+
 # ---------- Generic ----------
 `%||%` <- function(a, b) if (!is.null(a)) a else b
 
@@ -482,6 +431,15 @@ quant_norm <- function(x) {
   r <- rank(x, na.last = "keep")
   q <- qnorm((r - 0.5) / sum(!is.na(x)))
   (q - median(q, na.rm = TRUE)) / (stats::mad(q, constant = 1, na.rm = TRUE) + 1e-8)
+}
+
+block_boot <- function(DT, L) { # DT is a data.table
+  n <- nrow(DT)
+  starts <- sample(1:(n - L + 1), ceiling(n / L), replace=T) # random starts
+  
+  idx <- unlist(lapply(starts, function(s) s:(s + L - 1)))
+  
+  DT[idx[1:n]]
 }
 
 # ---------- Blocking ----------
@@ -547,9 +505,9 @@ define_blocks <- function(pos, chrom = NULL, max_gap = 1e5, max_span = 2e6, min_
 
 # ---------- Decay estimation ----------
 estimate_decay <- function(resid, pos, n_bins = 50, model = "exponential") {
-  if (length(resid) == 0 || length(pos) == 0) return(NULL)
+  if(length(resid) == 0 || length(pos) == 0) return(NULL)
   ok <- !is.na(resid) & !is.na(pos)
-  if (sum(ok) < 4) return(NULL)
+  if(sum(ok) < 4) return(NULL)
   tryCatch({
     samp_idx <- if (sum(ok) > 2000) sample(which(ok), 2000) else which(ok)
     pos_s <- pos[samp_idx]
@@ -568,17 +526,17 @@ estimate_decay <- function(resid, pos, n_bins = 50, model = "exponential") {
 
 # ---------- Covariance matrix builder ----------
 build_cov_matrix <- function(pos, cov_fun, nugget = 0, ridge = 1e-8, taper_radius = NULL, as_sparse = TRUE) {
-  if (length(pos) == 0) return(NULL)
+  if(length(pos) == 0) return(NULL)
   ok <- !is.na(pos)
-  if (sum(ok) == 0) return(NULL)
+  if(sum(ok) == 0) return(NULL)
   tryCatch({
     idx <- which(ok)
     pos_ok <- pos[idx]
     n <- length(pos_ok)
     D <- as.matrix(stats::dist(pos_ok))
     C <- cov_fun(D)
-    if (!is.null(nugget) && nugget > 0) diag(C) <- diag(C) + nugget
-    if (!is.null(taper_radius) && is.numeric(taper_radius) && taper_radius > 0) {
+    if(!is.null(nugget) && nugget > 0) diag(C) <- diag(C) + nugget
+    if(!is.null(taper_radius) && is.numeric(taper_radius) && taper_radius > 0) {
       Tmat <- pmax(0, 1 - D / taper_radius)
       C <- C * Tmat
     }
@@ -597,9 +555,9 @@ build_cov_matrix <- function(pos, cov_fun, nugget = 0, ridge = 1e-8, taper_radiu
 
 # ---------- GLS solver ----------
 gls_solve <- function(y, X, C_sp) {
-  if (length(y) == 0) return(NULL)
+  if(length(y) == 0) return(NULL)
   ok <- !is.na(y)
-  if (sum(ok) == 0) return(NULL)
+  if(sum(ok) == 0) return(NULL)
   tryCatch({
     y2 <- y[ok]
     X2 <- if (is.matrix(X)) X[ok, , drop = FALSE] else as.matrix(X[ok, , drop = FALSE])
@@ -618,16 +576,16 @@ gls_solve <- function(y, X, C_sp) {
       C_sub <- C_sp$C
     }
     
-    if (inherits(C_sub, "sparseMatrix")) {
+    if(inherits(C_sub, "sparseMatrix")) {
       chol_try <- try(Matrix::Cholesky(C_sub, LDL = FALSE), silent = TRUE)
-      if (inherits(chol_try, "try-error")) return(NULL)
+      if(inherits(chol_try, "try-error")) return(NULL)
       CinvX <- try(Matrix::solve(chol_try, X2), silent = TRUE)
       Cinvy <- try(Matrix::solve(chol_try, y2), silent = TRUE)
       if (inherits(CinvX, "try-error") || inherits(Cinvy, "try-error")) return(NULL)
       XtCinvX <- crossprod(as.matrix(CinvX))
-      if (det(XtCinvX) == 0 || any(is.na(XtCinvX))) {
+      if(det(XtCinvX) == 0 || any(is.na(XtCinvX))) {
         beta <- try(MASS::ginv(XtCinvX) %*% crossprod(as.matrix(CinvX), as.numeric(Cinvy)), silent = TRUE)
-        if (inherits(beta, "try-error")) return(NULL)
+        if(inherits(beta, "try-error")) return(NULL)
       } else {
         beta <- try(solve(XtCinvX, crossprod(as.matrix(CinvX), as.numeric(Cinvy))), silent = TRUE)
         if (inherits(beta, "try-error")) return(NULL)
@@ -664,7 +622,7 @@ gls_solve <- function(y, X, C_sp) {
 process_block <- function(df_block, response, pos_col = "pos", covariates = NULL,
                           model = "exponential", bin_n = 50, taper_radius = NULL,
                           ridge = 1e-8, nugget_override = NULL, min_block_size = 6,
-                          persist_dir = NULL, verbose = FALSE, block_id = NULL) {
+                          persist_dir = NULL, block_id = NULL) {
   res <- list(n = NA_integer_, method = NA_character_, success = FALSE, warnings = character(0))
   if (!is.data.frame(df_block)) { res$warnings <- c(res$warnings, "df_block not a data.frame"); return(res) }
   if (!(response %in% names(df_block))) { res$warnings <- c(res$warnings, "response missing"); return(res) }
@@ -752,15 +710,11 @@ gls_pipeline_full <- function(df, response, pos = "midpoint", chrom = "chrom",
                               covariates = NULL, block_max_gap = 1e5, block_max_span = 2e6,
                               model = "exponential", bin_n = 50, taper_radius = NULL,
                               ridge = 1e-8, nugget_override = NULL, min_block_size = 6,
-                              persist_dir = NULL, parallel = FALSE, verbose = TRUE) {
-  if (!is.data.frame(df)) stop("df must be a data.frame")
-  if (!(response %in% names(df))) stop("response not found")
-  if (!(pos %in% names(df))) stop("pos not found")
+                              persist_dir = NULL) {
   
   chrom_vec <- if (!is.null(chrom) && chrom %in% names(df)) df[[chrom]] else NULL
   blocks <- define_blocks(df[[pos]], chrom = chrom_vec, max_gap = block_max_gap, max_span = block_max_span)
   if(length(blocks) != nrow(df) || all(is.na(blocks))) {
-    if(verbose) message("define_blocks returned invalid length or all NA; using single block")
     blocks <- rep(1L, nrow(df))
   }
   
@@ -769,8 +723,7 @@ gls_pipeline_full <- function(df, response, pos = "midpoint", chrom = "chrom",
   block_fits <- list()
   
   unique_blocks <- sort(unique(blocks[!is.na(blocks)]))
-  if(verbose) message("Processing ", length(unique_blocks), " blocks for response '", response, "'")
-  
+
   for(b in unique_blocks) {
     idx <- which(blocks == b)
     df_block <- df[idx, , drop = FALSE]
@@ -779,10 +732,9 @@ gls_pipeline_full <- function(df, response, pos = "midpoint", chrom = "chrom",
         df_block, response = response, pos_col = pos, covariates = covariates,
         model = model, bin_n = bin_n, taper_radius = taper_radius,
         ridge = ridge, nugget_override = nugget_override, min_block_size = min_block_size,
-        persist_dir = NULL, verbose = verbose, block_id = b
+        persist_dir = NULL, block_id = b
       ),
       error = function(e) {
-        if(verbose) message("Error in block ", b, ": ", conditionMessage(e))
         list(n = length(idx), method = "error", warnings = c(conditionMessage(e)),
              fitted = rep(NA_real_, length(idx)), resid = rep(NA_real_, length(idx)))
       }
@@ -806,14 +758,8 @@ gls_preprocess_variables <- function(df, vars, pos = "midpoint", chrom = "chrom"
                                      model = "exponential", bin_n = 50,
                                      taper_radius = NULL, ridge = 1e-8, nugget_override = NULL,
                                      min_block_size = 6, persist_dir = NULL,
-                                     parallel = FALSE, future_workers = 4, verbose = TRUE) {
-  if (!is.data.frame(df)) stop("df must be a data.frame or data.table")
-  if (!is.character(vars) || length(vars) == 0) stop("vars must be a non-empty character vector")
-  missing_vars <- setdiff(vars, names(df))
-  if (length(missing_vars) > 0) stop("Some vars not found in df: ", paste(missing_vars, collapse = ", "))
-  if (!pos %in% names(df)) stop("pos column not found: ", pos)
-  if (!is.null(chrom) && !chrom %in% names(df)) stop("chrom column not found: ", chrom)
-  
+                                     future_workers = 4) {
+
   nrow_orig <- nrow(df)
   full_df <- df
   diagnostics <- list(global = list(call = match.call(),
@@ -821,12 +767,12 @@ gls_preprocess_variables <- function(df, vars, pos = "midpoint", chrom = "chrom"
                                     block_max_gap = block_max_gap, block_max_span = block_max_span,
                                     model = model, taper_radius = taper_radius, ridge = ridge,
                                     min_block_size = min_block_size,
-                                    parallel = parallel, future_workers = future_workers))
+                                    future_workers = future_workers))
   diagnostics$variables <- vector("list", length(vars))
   names(diagnostics$variables) <- vars
   
   proc_one_var <- function(varname) {
-    if(verbose) message("Processing variable: ", varname)
+    message("Processing variable: ", varname)
     valid_count <- sum(!is.na(df[[varname]]))
     if(valid_count == 0) {
       warning("Variable '", varname, "' has zero non-NA values; skipping and producing NA outputs")
@@ -842,9 +788,9 @@ gls_preprocess_variables <- function(df, vars, pos = "midpoint", chrom = "chrom"
                                      covariates = covariates, block_max_gap = block_max_gap, block_max_span = block_max_span,
                                      model = model, bin_n = bin_n, taper_radius = taper_radius, ridge = ridge,
                                      nugget_override = nugget_override, min_block_size = min_block_size,
-                                     persist_dir = NULL, parallel = FALSE, verbose = verbose), silent = TRUE)
+                                     persist_dir = NULL), silent = TRUE)
     
-    if (inherits(out_try, "try-error")) {
+    if(inherits(out_try, "try-error")) {
       warning("gls_pipeline_full failed for variable '", varname, "': ", conditionMessage(attr(out_try, "condition")))
       n <- nrow_orig
       full_cols <- list()
@@ -894,15 +840,10 @@ gls_preprocess_variables <- function(df, vars, pos = "midpoint", chrom = "chrom"
     list(success = TRUE, full_cols = full_cols, diagnostics = diag)
   }
   
-  if (parallel) {
-    if (!requireNamespace("future.apply", quietly = TRUE)) stop("future.apply required for parallel = TRUE; install it or set parallel = FALSE")
-    res_list <- future.apply::future_lapply(vars, proc_one_var, future.seed = TRUE)
-  } else {
-    res_list <- lapply(vars, proc_one_var)
-  }
+  res_list <- lapply(vars, proc_one_var)
   names(res_list) <- vars
   
-  for (v in vars) {
+  for(v in vars) {
     r <- res_list[[v]]
     cols <- r$full_cols
     for (nm in names(cols)) full_df[[nm]] <- cols[[nm]]
@@ -934,18 +875,9 @@ preprocess_sem_from_lavaan <- function(model,
                                        block_max_gap = 2e5,
                                        block_max_span = 2e6,
                                        ridge = 1e-8,
-                                       parallel = FALSE,
-                                       verbose = TRUE,
                                        apply_std = TRUE,
                                        gls_extra_args = list()) {
-  # model: lavaan model string
-  # df: data.frame / data.table with SEM variables and pos/chrom columns
-  # apply_std: if TRUE, create mean/SD standardized sem_df_std (returned)
-  # gls_extra_args: extra named args forwarded to gls_preprocess_variables
-  if(!is.character(model) || length(model) == 0) stop("model must be a lavaan model string")
-  if(!is.data.frame(df)) stop("df must be a data.frame or data.table")
-  
-  # helper: simple mean/SD standardizer with tiny-EPS guard
+
   std_by_sd <- function(x, eps = 1e-8) {
     if(all(is.na(x))) return(rep(NA_real_, length(x)))
     m <- mean(x, na.rm = TRUE)
@@ -990,8 +922,7 @@ preprocess_sem_from_lavaan <- function(model,
   # intersect with available columns in df
   vars_found <- intersect(vars_in_model, names(df))
   if(length(vars_found) == 0) stop("No model variables found in df columns. Check model and df names.")
-  if(verbose) message("Identified SEM variables (present in df): ", paste(sort(vars_found), collapse = ", "))
-  
+
   # call gls_preprocess_variables on the found variables
   call_args <- c(list(df = df,
                       vars = vars_found,
@@ -1001,14 +932,12 @@ preprocess_sem_from_lavaan <- function(model,
                       taper_radius = taper_radius,
                       block_max_gap = block_max_gap,
                       block_max_span = block_max_span,
-                      ridge = ridge,
-                      parallel = parallel,
-                      verbose = verbose),
+                      ridge = ridge),
                  gls_extra_args)
   
   res <- do.call(gls_preprocess_variables, call_args)
   
-  if (!is.list(res) || !all(c("sem_df", "full_df") %in% names(res))) {
+  if(!is.list(res) || !all(c("sem_df", "full_df") %in% names(res))) {
     stop("gls_preprocess_variables did not return expected structure (sem_df, full_df).")
   }
   
@@ -1016,21 +945,19 @@ preprocess_sem_from_lavaan <- function(model,
   full_df <- res$full_df
   diagnostics <- res$diagnostics %||% attr(full_df, "gls_preproc_diagnostics")
   
-  # Optionally standardize each sem variable by mean/SD
   sem_df_std <- NULL
-  if (isTRUE(apply_std)) {
+  if(isTRUE(apply_std)) {
     sem_df_std <- as.data.frame(lapply(sem_df_raw, function(x) std_by_sd(x)))
     names(sem_df_std) <- names(sem_df_raw)
     attr(sem_df_std, "std_method") <- "mean_sd"
   }
   
-  # Attach metadata and return
   attr(sem_df_raw, "model_vars") <- vars_found
   attr(full_df, "model_vars") <- vars_found
   result <- list(sem_df_raw = sem_df_raw,
                  full_df = full_df,
                  diagnostics = diagnostics)
-  if (!is.null(sem_df_std)) result$sem_df_std <- sem_df_std
+  if(!is.null(sem_df_std)) result$sem_df_std <- sem_df_std
   
   return(result)
 }

@@ -109,7 +109,7 @@ model_4 <- "
 
 # whether to assess robustness of r^2 by shuffling windows (computationally expensive)
 permut <- F
-bootstrap <- F
+bootstrap <- T
 
 ################## 10 kb #################
 for(m in constrained_models) {
@@ -1032,8 +1032,8 @@ if(bootstrap) { # bootstrapping windows
      for(b in 1:nboot) {
   
        setTxtProgressBar(pb, b)
-       cXX_boot <- cXX %>% dplyr::slice_sample(prop=1, replace=TRUE)
-  
+       cXX_boot <- block_boot(cXX, 20) # 20 windows-block at 10 kb
+     
        m1_fit <- sem(model_1,
                      data=cXX_boot,
                      estimator = "MLR",
@@ -1100,6 +1100,8 @@ if(bootstrap) { # bootstrapping windows
    boot_r2 <- data.table::rbindlist(chr_list)
    names(boot_r2)[1:4] <- paste("DAG", 1:4)
    boot_extended <- left_join(boot_r2, samp_size)
+   
+   fwrite(boot_extended, "boot_SEM_10kb_block5.csv.gz")
   
    cXX_boot_r2_m <- pivot_longer(boot_extended, cols=starts_with("DAG"), names_to="DAG", values_to="r-sqrd")
    cXX_boot_r2_m$chrom <- factor(cXX_boot_r2_m$chrom)
@@ -2033,7 +2035,7 @@ if(bootstrap) { # bootstrapping windows
     for(b in 1:nboot) {
       
       setTxtProgressBar(pb, b)
-      cXX_boot <- cXX %>% dplyr::slice_sample(prop=1, replace=TRUE)
+      cXX_boot <- block_boot(cXX, 10) # 10 windows-block at 100 kb
       
       m1_fit <- sem(model_1,
                     data=cXX_boot,
@@ -2101,6 +2103,8 @@ if(bootstrap) { # bootstrapping windows
   boot_r2 <- data.table::rbindlist(chr_list)
   names(boot_r2)[1:4] <- paste("DAG", 1:4)
   boot_extended <- left_join(boot_r2, samp_size)
+  
+  fwrite(boot_extended, "boot_SEM_100kb_block10.csv.gz")
   
   cXX_boot_r2_m <- pivot_longer(boot_extended, cols=starts_with("DAG"), names_to="DAG", values_to="r-sqrd")
   cXX_boot_r2_m$chrom <- factor(cXX_boot_r2_m$chrom)
@@ -3036,7 +3040,7 @@ if(bootstrap) { # bootstrapping windows
     for(b in 1:nboot) {
       
       setTxtProgressBar(pb, b)
-      cXX_boot <- cXX %>% dplyr::slice_sample(prop=1, replace=TRUE)
+      cXX_boot <- block_boot(cXX, 5) # 5 windows-block at 10 kb
       
       m1_fit <- sem(model_1,
                     data=cXX_boot,
@@ -3104,6 +3108,8 @@ if(bootstrap) { # bootstrapping windows
   boot_r2 <- data.table::rbindlist(chr_list)
   names(boot_r2)[1:4] <- paste("DAG", 1:4)
   boot_extended <- left_join(boot_r2, samp_size)
+  
+  fwrite(boot_extended, "boot_SEM_1Mb_block5.csv.gz")
   
   cXX_boot_r2_m <- pivot_longer(boot_extended, cols=starts_with("DAG"), names_to="DAG", values_to="r-sqrd")
   cXX_boot_r2_m$chrom <- factor(cXX_boot_r2_m$chrom)
